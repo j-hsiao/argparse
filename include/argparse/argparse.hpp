@@ -33,11 +33,8 @@
 
 #include <argparse/internal.hpp>
 
-#include <iostream>
+#include <cstddef>
 #include <map>
-#include <sstream>
-#include <stdexcept>
-#include <string>
 #include <vector>
 namespace argparse
 {
@@ -49,23 +46,16 @@ namespace argparse
 
 		//flags
 		template<class T, int nargs=1>
-		const decltype(Arg<T, nargs>::value)& flag(
-			std::vector<const char*> names,
-			const char *help,
+		const decltype(Arg<T, nargs>::value)& add(
+			const std::vector<const char*> &names,
+			const char *help="",
 			typename Arg<T, nargs>::def default_val={});
 
 		//convenience for flags if only 1 name.
 		template<class T, int nargs=1>
-		const decltype(Arg<T, nargs>::value)& flag(
+		const decltype(Arg<T, nargs>::value)& add(
 			const char *name,
-			const char *help,
-			typename Arg<T, nargs>::def default_val={});
-
-		//positional argument
-		template<class T, int nargs=1>
-		const decltype(Arg<T, nargs>::value)& pos(
-			const char *name,
-			const char *help,
+			const char *help="",
 			typename Arg<T, nargs>::def default_val={});
 
 		//return if parse success
@@ -76,7 +66,9 @@ namespace argparse
 		const char *program;
 		char prefix;
 		private:
+			void add_flag(const char *rawname);
 			void help() const;
+			std::map<std::size_t, std::vector<const char*>> names() const;
 			BaseArg* find_flag(const char *name) const;
 			std::vector<BaseArg*> flags;
 			std::vector<BaseArg*> positionals;

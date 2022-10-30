@@ -6,12 +6,24 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
+#include <ostream>
+#include <stdexcept>
+#include <string>
 #include <vector>
-#include <sstream>
 namespace argparse
 {
+	struct sstr
+	{
+		std::string str;
+		sstr() = default;
+		template<class T>
+		sstr(T &thing): str{thing} {}
+		operator const std::string&() const { return str; }
+	};
+
 	const char* rawname(const char* name, char prefix);
 	bool startswith(const char *value, const char *prefix);
+
 	struct CharCmp
 	{
 		bool operator()(const char *first, const char *second) const
@@ -20,17 +32,19 @@ namespace argparse
 
 	struct ArgIter
 	{
-		char * const *argv;
+		char * const * const argv;
 		int nskips;
-		int argc;
+		const int argc;
 		int pos;
 		char prefix;
-		ArgIter(int argc_, char **argv_, char prefix_='-', int pos_=0):
-			argv(argv_), nskips(0), argc(argc_), pos(pos_), prefix(prefix_)
+		ArgIter(int argc_, char **argv_, char prefix_='-'):
+			argv(argv_), nskips(0), argc(argc_), pos(0), prefix(prefix_)
 		{}
+		void reset() { pos = 0; nskips = 0; }
 		const char* operator()() const { return argv[pos]; }
 		//next argument
 		const char* next();
+		const char* nextflag();
 		const char* peek();
 		//next positional argument
 		const char* nextpos();
@@ -50,6 +64,8 @@ namespace argparse
 		//return: number of args consumed.
 		virtual void parse(ArgIter &args) = 0;
 		virtual int count() const = 0;
+		virtual std::string str() const = 0;
+		virtual bool ok() const { return true; }
 	};
 
 	template<class T, int nargs>
@@ -58,6 +74,21 @@ namespace argparse
 	//------------------------------
 	// implementation
 	//------------------------------
+	template<class T>
+	sstr& operator<<(sstr &&s, const T &thing)
+	{ s << thing; return s; }
+	template<class T>
+	sstr& operator<<(sstr &s, const T &thing)
+	{ s.str += std::to_string(thing); return s; }
+	sstr& operator<<(sstr &s, const std::string &thing)
+	{ s.str += thing; return s; }
+	sstr& operator<<(sstr &s, const char* thing)
+	{ s.str += thing; return s; }
+	sstr& operator<<(sstr &s, char* thing)
+	{ s.str += thing; return s; }
+	sstr& operator<<(sstr &s, char thing)
+	{ s.str += thing; return s; }
+
 	const char* rawname(const char *name, char prefix)
 	{
 		while (*name == prefix) { ++name; }
@@ -73,6 +104,17 @@ namespace argparse
 			{ ++pos; return next(); }
 			return argv[pos];
 		}
+	}
+	const char* ArgIter::nextflag()
+	{
+		while (pos < argc)
+		{
+			if (nskips) { --nskips; }
+			else if (argv[pos][0] == prefix && !skip(argv[pos]))
+			{ return argv[pos++]; }
+			++pos;
+		}
+		return nullptr;
 	}
 	const char* ArgIter::next()
 	{
@@ -123,6 +165,12 @@ namespace argparse
 		return false;
 	}
 
+	template<class T>
+	struct Argtype { typedef T type; };
+	template<>
+	struct Argtype<char*> { typedef const char* type; };
+
+
 	//templated conversions
 	template<class T>
 	T convert_(const char *str, char **end);
@@ -171,27 +219,19 @@ namespace argparse
 	{ return std::strtod(str, end); }
 
 	template<class T>
-	T convert(const char *arg)
+	typename Argtype<T>::type convert(const char *arg)
 	{
 		char *end;
 		errno = 0;
 		T ret = convert_<T>(arg, &end);
 		if (end == arg || *end != '\0')
-		{
-			std::string msg("Bad value: \"");
-			msg += arg;
-			msg += '"';
-			throw std::range_error(msg);
-		}
+		{ throw std::range_error(sstr("Bad value: \"") << arg << '"'); }
 		else if (errno == ERANGE)
-		{
-			std::string msg("value out of range: \"");
-			msg += arg;
-			msg += '"';
-			throw std::range_error(msg);
-		}
+		{ throw std::range_error(sstr("value out of range: \"") << arg << '"'); }
 		return ret;
 	}
+	template<>
+	const char* convert<const char*>(const char *arg) { return arg; }
 
 	template<bool yes, int val>
 	struct enable_if {};
@@ -202,8 +242,9 @@ namespace argparse
 	template<class T, int nargs>
 	struct Arg: public BaseArg
 	{
-		typedef std::array<T, static_cast<std::size_t>(nargs)> type;
-		typedef std::vector<T> def;
+		typedef typename Argtype<T>::type value_type;
+		typedef std::array<value_type, static_cast<std::size_t>(nargs)> type;
+		typedef const std::vector<value_type> def;
 		type value;
 		bool defaults;
 
@@ -214,10 +255,9 @@ namespace argparse
 		{
 			if (dvals.size() && dvals.size() != static_cast<std::size_t>(nargs))
 			{
-				std::stringstream s;
-				s << name << " expects " << nargs << " args, but was given "
-					<< dvals.size() << " defaults.";
-				throw std::logic_error(s.str());
+				throw std::logic_error(
+					sstr(name) << " expects " << nargs << " args, but was given "
+					<< dvals.size() << " defaults.");
 			}
 			for (std::size_t i=0; i<dvals.size(); ++i)
 			{ value[i] = dvals[i]; }
@@ -230,34 +270,49 @@ namespace argparse
 			const char *arg;
 			for (int i=0; i<nargs; ++i)
 			{
-				if (arg = args.nextpos())
-				{ value[i] = convert<T>(arg); }
-				else if (!defaults || i>0)
-				{
-					std::stringstream s;
-					s << name << " expects " << nargs << " values, but got "
-						<< i << '.';
-					throw std::runtime_error(s.str());
-				}
+				arg = args.nextpos();
+				if (arg)
+				//if (arg = args.nextpos())
+				{ value[i] = convert<value_type>(arg); }
 				else
-				{ return; }
+				{
+					throw std::runtime_error(
+						sstr(name) << " expects " << nargs << " values, but got "
+						<< i << '.');
+				}
 			}
 			defaults = true;
 		}
+		virtual std::string str() const
+		{
+			if (defaults)
+			{
+				sstr ret("[");
+				auto it = value.begin();
+				ret << *(it++);
+				while (it != value.end())
+				{ ret << ", " << *(it++); }
+				ret << ']';
+				return ret;
+			}
+			return "";
+		}
+		virtual bool ok() const { return defaults; }
 	};
 
 	//single arg
 	template<class T>
 	struct Arg<T, 1>: public BaseArg
 	{
+		typedef typename Argtype<T>::type value_type;
 		struct def
 		{
-			T value;
+			value_type value;
 			bool defaults;
 			def(): value{}, defaults(0) {}
-			def(T val): value{val}, defaults(1) {}
+			def(value_type val): value{val}, defaults(1) {}
 		};
-		typedef T type;
+		typedef value_type type;
 		type value;
 		bool defaults;
 		Arg(const char *name_, const char *help_, def dval):
@@ -270,17 +325,25 @@ namespace argparse
 		{
 			const char *arg; 
 			if (arg = args.nextpos())
-			{ value = convert<T>(arg); }
-			else if (!defaults)
-			{ throw std::runtime_error(std::string("missing argument ") += name); }
+			{ value = convert<value_type>(arg); }
+			else
+			{ throw std::runtime_error(sstr("missing argument for ") << name); }
 			defaults = true;
 		}
+		virtual std::string str() const
+		{
+			if (defaults)
+			{ return sstr() << value; }
+			return "";
+		}
+		virtual bool ok() const { return defaults; }
 	};
 	//variable args
 	template<class T>
 	struct Arg<T, -1>: public BaseArg
 	{
-		typedef std::vector<T> type;
+		typedef typename Argtype<T>::type value_type;
+		typedef std::vector<value_type> type;
 		typedef type def;
 		type value;
 		Arg(const char *name_, const char *help_="", type defaults={}):
@@ -294,17 +357,31 @@ namespace argparse
 			if (arg = args.nextpos())
 			{
 				value.clear();
-				value.push_back(convert<T>(arg));
+				value.push_back(convert<value_type>(arg));
 				while (arg = args.nextpos())
-				{ value.push_back(convert<T>(arg)); }
+				{ value.push_back(convert<value_type>(arg)); }
 			}
+		}
+		virtual std::string str() const
+		{
+			if (value.size())
+			{
+				sstr s("[");
+				auto it = value.begin();
+				s << *(it++);
+				while (it != value.end())
+				{ s << ", " << *(it++); }
+				s << ']';
+				return s;
+			}
+			return "";
 		}
 	};
 	//bool flag
 	template<>
 	struct Arg<bool, 0>: public BaseArg
 	{
-		typedef bool type;
+		typedef bool type, def;
 		type value;
 		Arg(const char *name_, const char *help_="", bool defaults=false):
 			BaseArg(name_, help_),
@@ -312,6 +389,8 @@ namespace argparse
 		{}
 		virtual int count() const { return 0; }
 		virtual void parse(ArgIter &args) { value = !value; }
+		virtual std::string str() const
+		{ return value ? "true" : "false"; }
 	};
 
 	bool startswith(const char *value, const char *prefix)
