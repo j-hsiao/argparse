@@ -174,7 +174,7 @@ namespace argparse
 			{
 				if (poss == positionals.end())
 				{
-					std::cerr << "unrecognized argument \"" << arg << '"';
+					std::cerr << "unrecognized argument \"" << arg << '"' << std::endl;
 					return true;
 				}
 				if (tryparse(*poss, args)) { return true; }
