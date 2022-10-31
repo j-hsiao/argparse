@@ -188,6 +188,7 @@ namespace argparse
 				std::cerr << "missing arguments for " << (*poss)->name << std::endl;
 				return true;
 			}
+			++poss;
 		}
 		for (BaseArg *flag : flags)
 		{
@@ -238,10 +239,9 @@ namespace argparse
 			{
 				std::cout << " | " << prefix << *(it++);
 			}
-			std::cout << ']';
 			int count = flags[i]->count();
 			if (count == 0)
-			{ std::cout << " default: " << flags[i]->str(); }
+			{ std::cout << "] (default: " << flags[i]->str() << ')'; }
 			else
 			{
 				std::cout << " <" << flagnames.back();
@@ -249,8 +249,9 @@ namespace argparse
 				std::cout << '>';
 				if (count > 1) { std::cout << 'x' << count; }
 				auto defaults = flags[i]->str();
+				std::cout << ']';
 				if (defaults.size())
-				{ std::cout << " default: " << defaults; }
+				{ std::cout << " (default: " << defaults << ')'; }
 			}
 			std::cout << std::endl;
 			if (flags[i]->help[0] != '\0')
@@ -266,7 +267,7 @@ namespace argparse
 			if (count > 1) { std::cout << 'x' << count; }
 			std::string val = pos->str();
 			if (val.size())
-			{ std::cout << " default: " << val; }
+			{ std::cout << " (default: " << val << ')'; }
 			std::cout << std::endl;
 			if (pos->help[0] != '\0')
 			{ std::cout << "    " << pos->help << std::endl; }

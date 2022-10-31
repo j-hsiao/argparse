@@ -393,6 +393,22 @@ namespace argparse
 		{ return value ? "true" : "false"; }
 	};
 
+	//int flag (count how many occurrences)
+	template<>
+	struct Arg<int, 0>: public BaseArg
+	{
+		typedef int type, def;
+		type value;
+		Arg(const char *name_, const char *help_="", int defaults=0):
+			BaseArg(name_, help_),
+			value{defaults}
+		{}
+		virtual int count() const { return 0; }
+		virtual void parse(ArgIter &args) { ++value; }
+		virtual std::string str() const
+		{ return std::to_string(value); }
+	};
+
 	bool startswith(const char *value, const char *prefix)
 	{
 		std::size_t i = 0;
