@@ -44,7 +44,7 @@ namespace argparse
 
 
 	template<class T, int nargs>
-	const decltype(Arg<T, nargs>::value)& Parser::add(
+	decltype(Arg<T, nargs>::value)& Parser::add(
 		const std::vector<const char*> &names,
 		const char *help,
 		typename Arg<T, nargs>::def dval)
@@ -87,7 +87,7 @@ namespace argparse
 	}
 
 	template<class T, int nargs>
-	const decltype(Arg<T, nargs>::value)& Parser::add(
+	decltype(Arg<T, nargs>::value)& Parser::add(
 		const char *name,
 		const char *help,
 		typename Arg<T, nargs>::def dval)
