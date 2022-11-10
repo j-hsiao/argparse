@@ -45,14 +45,14 @@ namespace argparse
 		~Parser();
 
 		//flags
-		template<class T, int nargs=1>
+		template<class T, int nargs=defaultn<T>::nargs>
 		decltype(Arg<T, nargs>::value)& add(
 			const std::vector<const char*> &names,
 			const char *help="",
 			typename Arg<T, nargs>::def default_val={});
 
 		//convenience for flags if only 1 name.
-		template<class T, int nargs=1>
+		template<class T, int nargs=defaultn<T>::nargs>
 		decltype(Arg<T, nargs>::value)& add(
 			const char *name,
 			const char *help="",

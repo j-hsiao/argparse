@@ -207,7 +207,8 @@ namespace argparse
 		auto mp = names();
 		for (std::size_t i=0; i<flags.size(); ++i)
 		{
-			std::cout << " [-" << mp[i][0];
+			const char *wrap = flags[i]->ok() ? "[]" : "()";
+			std::cout << ' ' << wrap[0] << prefix << mp[i][0];
 			BaseArg *ptr = flags[i];
 			if (ptr->count() < 0)
 			{ std::cout << " ..."; }
@@ -217,31 +218,33 @@ namespace argparse
 				if (ptr->count() > 1)
 				{ std::cout << 'x' << ptr->count(); }
 			}
-			std::cout << ']';
+			std::cout << wrap[1];
 		}
 		for (const auto *pos: positionals)
 		{
-			std::cout << " <" << pos->name;
+			const char *wrap = pos->ok() ? "[]" : "<>";
+			std::cout << ' ' << wrap[0] << pos->name;
 			if (pos->count() < 0)
 			{ std::cout << " ..."; }
-			std::cout << '>';
+			std::cout << wrap[1];
 			if (pos->count() > 1)
 			{ std::cout << 'x' << pos->count(); }
 		}
 		std::cout << std::endl << std::endl << "Flags:" << std::endl;
 		for (std::size_t i=0; i<flags.size(); ++i)
 		{
+			const char *wrap = flags[i]->ok() ? "[]" : "()";
 			const auto &flagnames = mp[i];
 			auto it = flagnames.begin();
 			auto end = flagnames.end();
-			std::cout << "  [" << prefix << *(it++);
+			std::cout << "  " << wrap[0] << prefix << *(it++);
 			while (it != end)
 			{
 				std::cout << " | " << prefix << *(it++);
 			}
 			int count = flags[i]->count();
 			if (count == 0)
-			{ std::cout << "] (default: " << flags[i]->str() << ')'; }
+			{ std::cout << wrap[1] << " (default: " << flags[i]->str() << ')'; }
 			else
 			{
 				std::cout << " <" << flagnames.back();
@@ -249,7 +252,7 @@ namespace argparse
 				std::cout << '>';
 				if (count > 1) { std::cout << 'x' << count; }
 				auto defaults = flags[i]->str();
-				std::cout << ']';
+				std::cout << wrap[1];
 				if (defaults.size())
 				{ std::cout << " (default: " << defaults << ')'; }
 			}
@@ -260,10 +263,11 @@ namespace argparse
 		std::cout << std::endl << "Positionals:" << std::endl;
 		for (BaseArg *pos : positionals)
 		{
-			std::cout << "  <" << pos->name;
+			const char *wrap = pos->ok() ? "[]" : "<>";
+			std::cout << "  " << wrap[0] << pos->name;
 			int count = pos->count();
 			if (count < 0) { std::cout << " ..."; }
-			std::cout << '>';
+			std::cout << wrap[1];
 			if (count > 1) { std::cout << 'x' << count; }
 			std::string val = pos->str();
 			if (val.size())

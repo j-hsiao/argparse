@@ -238,6 +238,14 @@ namespace argparse
 	template<int val>
 	struct enable_if<true, val>{static const int value=val;};
 
+	template<class T, class V>
+	struct same { static const bool value=false; };
+	template<class T>
+	struct same<T,T> { static const bool value=true; };
+	template<class T>
+	struct defaultn{ static const int nargs = same<T, bool>::value ? 0 : 1; };
+
+
 	//fixed number of args
 	template<class T, int nargs>
 	struct Arg: public BaseArg
