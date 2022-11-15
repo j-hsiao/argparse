@@ -176,27 +176,27 @@ namespace argparse
 	T convert_(const char *str, char **end);
 
 	template<>
-	long convert_<long>(const char *str, char **end)
+	inline long convert_<long>(const char *str, char **end)
 	{ return std::strtol(str, end, 10); }
 	template<>
-	long long convert_<long long>(const char *str, char **end)
+	inline long long convert_<long long>(const char *str, char **end)
 	{ return std::strtoll(str, end, 10); }
 
 	template<>
-	unsigned long convert_<unsigned long>(const char *str, char **end)
+	inline unsigned long convert_<unsigned long>(const char *str, char **end)
 	{
 		if (std::strtol(str, end, 10) < 0) { errno = ERANGE; }
 		return std::strtoul(str, end, 10);
 	}
 	template<>
-	unsigned long long convert_<unsigned long long>(const char *str, char **end)
+	inline unsigned long long convert_<unsigned long long>(const char *str, char **end)
 	{
 		if (std::strtoll(str, end, 10) < 0) { errno = ERANGE; }
 		return std::strtoull(str, end, 10);
 	}
 
 	template<>
-	int convert_<int>(const char *str, char **end)
+	inline int convert_<int>(const char *str, char **end)
 	{
 		long long val = convert_<long long>(str, end);
 		if (val < INT_MIN) { errno = ERANGE; }
@@ -204,7 +204,7 @@ namespace argparse
 		return static_cast<int>(val);
 	}
 	template<>
-	unsigned int convert_<unsigned int>(const char *str, char **end)
+	inline unsigned int convert_<unsigned int>(const char *str, char **end)
 	{
 		unsigned long long val = convert_<unsigned long long>(str, end);
 		if (val > UINT_MAX) { errno = ERANGE; }
@@ -212,10 +212,10 @@ namespace argparse
 	}
 
 	template<>
-	float convert_<float>(const char *str, char **end)
+	inline float convert_<float>(const char *str, char **end)
 	{ return std::strtof(str, end); }
 	template<>
-	double convert_<double>(const char *str, char **end)
+	inline double convert_<double>(const char *str, char **end)
 	{ return std::strtod(str, end); }
 
 	template<class T>
@@ -231,7 +231,7 @@ namespace argparse
 		return ret;
 	}
 	template<>
-	const char* convert<const char*>(const char *arg) { return arg; }
+	inline const char* convert<const char*>(const char *arg) { return arg; }
 
 	template<bool yes, int val>
 	struct enable_if {};
