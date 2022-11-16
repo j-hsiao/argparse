@@ -153,7 +153,7 @@ namespace argparse
 				arg[0] == prefix
 				&& flagmap.find(arg) == flagmap.end()
 				&& startswith("help", rawname(arg, prefix)))
-			{ help(); return true; }
+			{ help(arg); return true; }
 		}
 		args.reset();
 		auto poss = positionals.begin();
@@ -201,9 +201,11 @@ namespace argparse
 		return false;
 	}
 
-	void Parser::help() const
+	void Parser::help(const char *arg) const
 	{
-		std::cout << "usage: " << program;
+		std::cout << "usage: ";
+		if (program) { std::cout << program; }
+		else { std::cout << "<program name>" << std::endl; }
 		auto mp = names();
 		for (std::size_t i=0; i<flags.size(); ++i)
 		{
@@ -230,6 +232,15 @@ namespace argparse
 			if (pos->count() > 1)
 			{ std::cout << 'x' << pos->count(); }
 		}
+		//depending on number of prefix chars make more verbose help.
+		//-: just bare minimum
+		//--: longer, but shorten long default arglists
+		//---: full help
+		const char *p = std::strchr(arg, 'h');
+		int nprefix = p ? p-arg : 0;
+		if (nprefix < 2) { std::cout << std::endl; return; }
+		if (description)
+		{ std::cout << std::endl << std::endl << description; }
 		std::cout << std::endl << std::endl << "Flags:" << std::endl;
 		for (std::size_t i=0; i<flags.size(); ++i)
 		{
@@ -244,19 +255,19 @@ namespace argparse
 			}
 			int count = flags[i]->count();
 			if (count == 0)
-			{ std::cout << wrap[1] << " (default: " << flags[i]->str() << ')'; }
+			{ std::cout << wrap[1] << " (default: " << flags[i]->str(nprefix>2) << ')'; }
 			else
 			{
 				std::cout << " <" << flagnames.back();
 				if (count < 0) { std::cout << " ..."; }
 				std::cout << '>';
 				if (count > 1) { std::cout << 'x' << count; }
-				auto defaults = flags[i]->str();
+				auto defaults = flags[i]->str(nprefix>2);
 				std::cout << wrap[1];
 				if (defaults.size())
 				{ std::cout << " (default: " << defaults << ')'; }
 			}
-			std::cout << std::endl;
+			std::cout << " (" << flags[i]->tp() << ')' << std::endl;
 			if (flags[i]->help[0] != '\0')
 			{ std::cout << "    " << flags[i]->help << std::endl;}
 		}
@@ -269,10 +280,10 @@ namespace argparse
 			if (count < 0) { std::cout << " ..."; }
 			std::cout << wrap[1];
 			if (count > 1) { std::cout << 'x' << count; }
-			std::string val = pos->str();
+			std::string val = pos->str(nprefix>2);
 			if (val.size())
 			{ std::cout << " (default: " << val << ')'; }
-			std::cout << std::endl;
+			std::cout << " (" << pos->tp() << ')' << std::endl;
 			if (pos->help[0] != '\0')
 			{ std::cout << "    " << pos->help << std::endl; }
 		}

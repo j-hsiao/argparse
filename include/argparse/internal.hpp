@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <typeinfo>
 namespace argparse
 {
 	struct sstr
@@ -29,6 +30,24 @@ namespace argparse
 		bool operator()(const char *first, const char *second) const
 		{ return std::strcmp(first, second) < 0; }
 	};
+
+	//typeinfo names aren't always useful
+	template<class T>
+	struct Typename { static const char *name() { return typeid(T).name(); } };
+	//some more common types
+#	define MAKE_TYPENAME(tp) \
+	template<> \
+	struct Typename<tp> { static const char *name() { return #tp ; } };
+
+	MAKE_TYPENAME(bool)
+	MAKE_TYPENAME(int)
+	MAKE_TYPENAME(float)
+	MAKE_TYPENAME(double)
+	MAKE_TYPENAME(unsigned int)
+	MAKE_TYPENAME(const char*)
+
+#	undef MAKE_TYPENAME
+
 
 	struct ArgIter
 	{
@@ -64,7 +83,8 @@ namespace argparse
 		//return: number of args consumed.
 		virtual void parse(ArgIter &args) = 0;
 		virtual int count() const = 0;
-		virtual std::string str() const = 0;
+		virtual std::string str(bool longhelp) const = 0;
+		virtual const char* tp() const = 0;
 		virtual bool ok() const { return true; }
 	};
 
@@ -291,17 +311,29 @@ namespace argparse
 			}
 			defaults = true;
 		}
-		virtual std::string str() const
+		virtual const char* tp() const
+		{ return Typename<value_type>::name(); }
+		virtual std::string str(bool longhelp) const
 		{
 			if (defaults)
 			{
-				sstr ret("[");
-				auto it = value.begin();
-				ret << *(it++);
-				while (it != value.end())
-				{ ret << ", " << *(it++); }
-				ret << ']';
-				return ret;
+				if (nargs < 4 || longhelp)
+				{
+					sstr ret("[");
+					auto it = value.begin();
+					ret << *(it++);
+					while (it != value.end())
+					{ ret << ", " << *(it++); }
+					ret << ']';
+					return ret;
+				}
+				else
+				{
+					sstr ret("[");
+					ret << value[0] << ", " << value[1] << ", ..., "
+						<< value[nargs-1] << "]";
+					return ret;
+				}
 			}
 			return "";
 		}
@@ -338,7 +370,9 @@ namespace argparse
 			{ throw std::runtime_error(sstr("missing argument for ") << name); }
 			defaults = true;
 		}
-		virtual std::string str() const
+		virtual const char* tp() const
+		{ return Typename<value_type>::name(); }
+		virtual std::string str(bool longhelp) const
 		{
 			if (defaults)
 			{ return sstr() << value; }
@@ -370,17 +404,29 @@ namespace argparse
 				{ value.push_back(convert<value_type>(arg)); }
 			}
 		}
-		virtual std::string str() const
+		virtual const char* tp() const
+		{ return Typename<value_type>::name(); }
+		virtual std::string str(bool longhelp) const
 		{
 			if (value.size())
 			{
-				sstr s("[");
-				auto it = value.begin();
-				s << *(it++);
-				while (it != value.end())
-				{ s << ", " << *(it++); }
-				s << ']';
-				return s;
+				if (value.size() < 5 || longhelp)
+				{
+					sstr s("[");
+					auto it = value.begin();
+					s << *(it++);
+					while (it != value.end())
+					{ s << ", " << *(it++); }
+					s << ']';
+					return s;
+				}
+				else
+				{
+					sstr s("[");
+					s << value[0] << ", " << value[1] << ", ..., "
+						<< value[value.size()-1] << "]";
+					return s;
+				}
 			}
 			return "";
 		}
@@ -389,7 +435,7 @@ namespace argparse
 	template<>
 	struct Arg<bool, 0>: public BaseArg
 	{
-		typedef bool type, def;
+		typedef bool type, def, value_type;
 		type value;
 		Arg(const char *name_, const char *help_="", bool defaults=false):
 			BaseArg(name_, help_),
@@ -397,7 +443,9 @@ namespace argparse
 		{}
 		virtual int count() const { return 0; }
 		virtual void parse(ArgIter &args) { value = !value; }
-		virtual std::string str() const
+		virtual const char* tp() const
+		{ return Typename<value_type>::name(); }
+		virtual std::string str(bool longhelp) const
 		{ return value ? "true" : "false"; }
 	};
 
@@ -405,7 +453,7 @@ namespace argparse
 	template<>
 	struct Arg<int, 0>: public BaseArg
 	{
-		typedef int type, def;
+		typedef int type, def, value_type;
 		type value;
 		Arg(const char *name_, const char *help_="", int defaults=0):
 			BaseArg(name_, help_),
@@ -413,16 +461,13 @@ namespace argparse
 		{}
 		virtual int count() const { return 0; }
 		virtual void parse(ArgIter &args) { ++value; }
-		virtual std::string str() const
+		virtual const char* tp() const
+		{ return Typename<value_type>::name(); }
+		virtual std::string str(bool longhelp) const
 		{ return std::to_string(value); }
 	};
 
 	bool startswith(const char *value, const char *prefix)
-	{
-		std::size_t i = 0;
-		while (value[i] == prefix[i] && value[i] != '\0' && prefix[i] != '\0')
-		{ i += 1; }
-		return prefix[i] == '\0';
-	}
+	{ return std::strstr(value, prefix) == value; }
 }
 #endif

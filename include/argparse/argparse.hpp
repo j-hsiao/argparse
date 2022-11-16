@@ -6,28 +6,42 @@
 //    --: treat all remaining arguments as positional arguments
 //    --N: N is a number, treat the next N arguments as positional
 //         arguments.
+//    -help: Trigger the help message.  With 1 prefix char, just print
+//           the basic usage.  With 2 prefix chars, also add program
+//           description if given, and descriptions of each argument.
+//           Default values will be shortened if more than 4 values.
+//           With 3 or more prefix chars, same as 2 but default value
+//           lists are not shortened.
 //  Aside from these special flags, the number of prefix chars does
 //  not matter.  --myflag and -myflag will be treated the same.
 //  If for some reason you want a flag called "1", then --1 will
 //  activate the special flags handling.  However, -1 or ---1 will map
 //  to a flag called "1"
-//  Flags also have unique-matching.  If incomplete and there is exactly
+//  Flags also have uniqueness-matching.  If incomplete and there is exactly
 //  1 flag that matches, then that flag will be used.
+//  eg. added flags: -myflag -whatever
+//      -w will cause -whatever to be used.
+//      -m will cause -myflag to be used.
 //
 // usage:
-//    argparse::Parser p(prefix='-', program="");
-//    type &myref = p.[flag|pos]<type, count>(
+//    #include "argparse/argparse.hpp"
+//
+//    argparse::Parser p("description string", prefix='-', program="");
+//    type &myref = p.add<type, count>(
 //      {name1, name2, ...}|name, help, {default1, default2, ...})
-//    p.parse(argc-1, argv+1);
-//    p.parse_main(argc, argv);
-//    func_that_takes_type_as_arg(placeholder);
+//    if (p.parse(argc-1, argv+1)) { return 1; }
+//    if (p.parse_main(argc, argv)) { return 1; }
+//    func_that_takes_type_as_arg(myref);
+// parse/parse_main will return True if the program should exit.
+//  This could be because -help was encountered, or because some error.
 //
-// if count is 1, then ref is to type
-// if count > 1, then ref is to an array of type
-// if count < 0, then ref is to a std::vector<type>
-// if count == 0, then ref is a bool
+// If count is 1 or 0, then ref is to type
+// If count > 1, then ref is to std::array<type, count>
+// If count < 0, then ref is to a std::vector<type>
 //
-//
+// A count of 0 is applicable for bool and int.
+//  If type is bool, then the flag will toggle the value.
+//  If type is int, then encountering the flag will increment the value.
 #ifndef ARGPARSE_HPP
 #define ARGPARSE_HPP
 
@@ -40,8 +54,8 @@ namespace argparse
 {
 	struct Parser
 	{
-		Parser(char prefix_='-', const char *program_=""):
-			program(program_), prefix(prefix_) {}
+		Parser(const char *desc=nullptr, char prefix_='-', const char *program_=nullptr):
+			program{program_}, description{desc}, prefix{prefix_} {}
 		~Parser();
 
 		//flags
@@ -64,10 +78,11 @@ namespace argparse
 		{ program = argv[0]; return parse(argc-1, argv+1); }
 
 		const char *program;
+		const char *description;
 		char prefix;
 		private:
 			void add_flag(const char *rawname);
-			void help() const;
+			void help(const char *arg="") const;
 			std::map<std::size_t, std::vector<const char*>> names() const;
 			BaseArg* find_flag(const char *name) const;
 			std::vector<BaseArg*> flags;
