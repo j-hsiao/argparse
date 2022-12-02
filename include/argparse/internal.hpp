@@ -103,9 +103,21 @@ namespace argparse
 	sstr& operator<<(sstr &s, const std::string &thing)
 	{ s.str += thing; return s; }
 	sstr& operator<<(sstr &s, const char* thing)
-	{ s.str += thing; return s; }
+	{
+		if (thing)
+		{ s.str += thing; return s; }
+		else
+		{ s.str += "nullptr"; }
+		return s;
+	}
 	sstr& operator<<(sstr &s, char* thing)
-	{ s.str += thing; return s; }
+	{
+		if (thing)
+		{ s.str += thing; return s; }
+		else
+		{ s.str += "nullptr"; }
+		return s;
+	}
 	sstr& operator<<(sstr &s, char thing)
 	{ s.str += thing; return s; }
 
