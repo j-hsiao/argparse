@@ -131,11 +131,24 @@ namespace argparse
 		virtual ~Arg(){}
 	};
 
+	template<class T, int N>
+	struct rtype {
+		typedef std::array<T, N> value_type;
+		static value_type& get(std::array<T, N> &arr) { return arr; }
+	};
+	template<class T>
+	struct rtype<T, 1> {
+		typedef T value_type;
+		static value_type& get(std::array<T, 1> &arr) { return arr[0]; }
+	};
+
 	//fixed args
 	template<class T, int N=1>
 	struct TypedArg: public Arg
 	{
 		std::array<T,N> value;
+		typename rtype<T, N>::value_type& ref()
+		{ return rtype<T, N>::get(value); }
 
 		TypedArg(
 			const char *name, const char *help="",
@@ -182,6 +195,7 @@ namespace argparse
 	struct TypedArg<bool, 0>: public Arg
 	{
 		bool value;
+		bool& ref() { return value; }
 		TypedArg(const char *name, const char *help="", bool value=true, bool required=false):
 			Arg(name, help, false), value(value)
 		{}
@@ -206,6 +220,7 @@ namespace argparse
 	struct TypedArg<bool, 1>: public Arg
 	{
 		int value;
+		int& ref() { return value; }
 		TypedArg(const char *name, const char *help="", int value=0, bool required=false):
 			Arg(name, help, false), value(value)
 		{}
@@ -230,6 +245,7 @@ namespace argparse
 	struct TypedArg<T, -1>: public Arg
 	{
 		std::vector<T> value;
+		std::vector<T>& ref() { return value; }
 		TypedArg(const char *name, const char *help="", std::vector<T> value={}, bool required=false):
 			Arg(name, help, required),
 			value(value)
@@ -285,7 +301,7 @@ namespace argparse
 		{}
 
 		template<class T, int N=1>
-		decltype(TypedArg<T, N>::value)& add(
+		decltype(((TypedArg<T, N>*)nullptr)->ref()) add(
 			const char *name, const char *help, decltype(TypedArg<T, N>::value) value, bool required)
 		{
 			if (is_type<T, bool>::value && (N == 0 || N == 1) && name[0] != prefix[0])
@@ -296,16 +312,16 @@ namespace argparse
 			{ flags.push_back(ptr); }
 			else
 			{ positionals.push_back(ptr); }
-			return ptr->value;
+			return ptr->ref();
 		}
 
 		//default value implies not required
 		//If required, why default value?
 		template<class T, int N=1>
-		decltype(TypedArg<T, N>::value)& add(const char *name, const char *help="")
+		decltype(((TypedArg<T, N>*)nullptr)->ref()) add(const char *name, const char *help="")
 		{ return add<T,N>(name, help, {}, true); }
 		template<class T, int N=1>
-		decltype(TypedArg<T, N>::value)& add(
+		decltype(((TypedArg<T, N>*)nullptr)->ref()) add(
 			const char *name, const char *help, decltype(TypedArg<T, N>::value) value)
 		{ return add<T,N>(name, help, value, false); }
 
