@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(argparse VERSION 0.1 LANGUAGES CXX)
+project(argparse VERSION 0.2 LANGUAGES CXX)
 add_library(argparse INTERFACE)
 target_include_directories(
 	argparse
