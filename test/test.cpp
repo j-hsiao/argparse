@@ -4,6 +4,20 @@
 #include <vector>
 #include <string>
 
+template<std::size_t N>
+struct charp
+{
+	std::vector<char*> args;
+	charp(char (*argv)[N], std::size_t size)
+	{
+		for (std::size_t i=0; i<size / N; ++i)
+		{ args.push_back(argv[i]); }
+	}
+
+	char** argv() { return &args[0]; }
+	int argc() { return static_cast<int>(args.size()); }
+};
+
 int main(int argc, char *argv[])
 {
 #	define pre "-"
@@ -126,6 +140,17 @@ int main(int argc, char *argv[])
 		assert(initial == "initial value");
 		assert(remainder.argc == 1);
 		assert(remainder.argv[0] == std::string(pre "help"));
+	}
+	{
+		argparse::Parser p("", pre);
+		auto &b = p.add<bool>("-bool");
+		auto &i = p.add<int>("num");
+		char buf[][20] = {"prog", pre pre "1", "-69", "-b"};
+		charp args(buf, sizeof(buf));
+
+		assert(p.parse(args.argc(), args.argv()));
+		assert(b);
+		assert(i==-69);
 	}
 	return 0;
 }

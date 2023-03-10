@@ -74,9 +74,8 @@ namespace argparse
 		{
 			if (argv[0][2])
 			{
-				if (store(flagskip, argv[0]+offset, base) && flagskip > 0)
-				{ ++flagskip; }
-				else { flagskip = 0; }
+				if (!(store(flagskip, argv[0]+offset, base) && flagskip > 0))
+				{ flagskip = 0; }
 			}
 			else
 			{ flagskip = -1; }
@@ -103,7 +102,7 @@ namespace argparse
 		operator bool() const { return argc > 0; }
 
 		//Is current arg a flag?
-		bool isflag() { return !flagskip && offset > 0; }
+		bool isflag() { return offset > 0; }
 
 		//Return length of name covered by current arg with caveat.
 		//Exact match = -1
