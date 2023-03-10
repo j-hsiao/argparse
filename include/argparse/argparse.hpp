@@ -10,6 +10,15 @@
 //
 // lazy, no map because 1. simpler, 2. how many args would you add?
 // shouldn't affect performance much.
+//
+// help notation:
+//   (xN): fixed N arguments
+//   (+): required multi argument
+//   (*): optional multi argument
+//   (**): remainder
+//   (++): incrementing boolean flag
+//   (!!): toggling boolean flag
+// later flags will overwrite newer flags.
 #ifndef ARGPARSE_HPP
 #define ARGPARSE_HPP
 #include <array>
@@ -22,6 +31,7 @@
 
 namespace argparse
 {
+	static const int Remainder = -2;
 	struct RawArgs
 	{
 		char **argv;
@@ -36,11 +46,11 @@ namespace argparse
 			argv(argv),
 			prefix(prefix),
 			argc(argc),
-			offset(argc ? std::strspn(*argv, prefix) : 0),
+			offset(argc>0 ? std::strspn(*argv, prefix) : 0),
 			flagskip(0)
-		{
-			if (offset == 2) { calcskip(); }
-		}
+		{ if (offset == 2) { calcskip(); } }
+
+		void clear() { argc = 0; }
 
 		void calcskip()
 		{
@@ -50,6 +60,7 @@ namespace argparse
 				s >> flagskip;
 				//on failure, 0 is written to value?
 				if (flagskip > 0) { ++flagskip; }
+				else { flagskip = 0; }
 			}
 			else
 			{ flagskip = -1; }
@@ -104,8 +115,12 @@ namespace argparse
 		}
 	};
 	template<>
-	void RawArgs::to<const char*>(const char* &ptr)
-	{ ptr = *argv; }
+	void RawArgs::to<const char*>(const char* &ptr) { ptr = *argv; }
+	template<>
+	void RawArgs::to<char*>(char* &ptr) { ptr = *argv; }
+	//if arg contains spaces, stringstream would only store up to space.
+	template<>
+	void RawArgs::to<std::string>(std::string &out) { out = *argv; }
 
 
 	struct Arg
@@ -118,8 +133,20 @@ namespace argparse
 			name(name), help(help), required(required)
 		{}
 
-		virtual void helpshort(std::ostream &o, const char *prefix="") = 0;
-		virtual void helplong(std::ostream &o, const char *prefix="") = 0;
+		void helpshort(std::ostream &o, const char *prefix="")
+		{
+			const char *wrap = prefix[0] ? "[]" : "<>";
+			o << wrap[0] << prefix << name << " (";
+			countsym(o);
+			o << ")" << wrap[1];
+		}
+		void helplong(std::ostream &o)
+		{
+			defaults(o);
+			if (help[0]) { o << std::endl << '\t' << help; }
+		}
+		virtual void countsym(std::ostream &o) = 0;
+		virtual void defaults(std::ostream &o) {};
 
 		bool parse(RawArgs &args)
 		{
@@ -157,14 +184,9 @@ namespace argparse
 			Arg(name, help, required), value(value)
 		{}
 
-		void helpshort(std::ostream &o, const char *prefix="") override
+		void countsym(std::ostream &o) override { o << 'x' << N; }
+		void defaults(std::ostream &o) override
 		{
-			const char *wrap = prefix[0] ? "[]" : "<>";
-			o << wrap[0] << prefix << name << " (x" << N << ")" << wrap[1];
-		}
-		void helplong(std::ostream &o, const char *prefix="") override
-		{
-			helpshort(o, prefix);
 			if (!required)
 			{
 				o << " (" << value[0];
@@ -172,7 +194,6 @@ namespace argparse
 				{ o << ", " << value[i]; }
 				o << ")";
 			}
-			if (help[0]) { o << std::endl << '\t' << help; };
 		}
 
 		bool parsevals(RawArgs &args) override
@@ -200,14 +221,9 @@ namespace argparse
 			Arg(name, help, false), value(value)
 		{}
 
-		void helpshort(std::ostream &o, const char *prefix="") override
-		{ o << '[' << prefix << name << " (!)" << ']'; }
-		void helplong(std::ostream &o, const char *prefix="") override
-		{
-			helpshort(o, prefix);
-			o << " (" << static_cast<int>(value) << ")" << std::endl;
-			if (help[0]) { o << std::endl << '\t' << help; };
-		}
+		void countsym(std::ostream &o) override { o << "!!"; }
+		void defaults(std::ostream &o) override
+		{ o << " (" << static_cast<int>(value) << ")"; }
 
 		bool parsevals(RawArgs &args) override
 		{
@@ -215,7 +231,7 @@ namespace argparse
 			return true;
 		}
 	};
-	//count bool
+	//incrementing bool
 	template<>
 	struct TypedArg<bool, 1>: public Arg
 	{
@@ -225,13 +241,8 @@ namespace argparse
 			Arg(name, help, false), value(value)
 		{}
 
-		void helpshort(std::ostream &o, const char *prefix="") override
-		{ o << '[' << prefix << name << " (+)" << ']'; }
-		void helplong(std::ostream &o, const char *prefix="") override
-		{
-			helpshort(o, prefix);
-			if (help[0]) { o << std::endl << '\t' << help; };
-		}
+		void countsym(std::ostream &o) override { o << "++"; }
+		void defaults(std::ostream &o) override { o << "(" << value << ")"; }
 
 		bool parsevals(RawArgs &args) override
 		{
@@ -251,14 +262,9 @@ namespace argparse
 			value(value)
 		{}
 
-		void helpshort(std::ostream &o, const char *prefix="") override
+		void countsym(std::ostream &o) override { o << (required ? "+" : "*"); }
+		void defaults(std::ostream &o) override
 		{
-			const char *wrap = prefix[0] ? "[]" : "<>";
-			o << wrap[0] << prefix << name << " (" << (required ? '+' : '*') << ')' << wrap[1];
-		}
-		void helplong(std::ostream &o, const char *prefix="") override
-		{
-			helpshort(o, prefix);
 			if (value.size())
 			{
 				o << " (" << value[0];
@@ -266,7 +272,6 @@ namespace argparse
 				{ o << ", " << value[i]; }
 				o << ")";
 			}
-			if (help[0]) { o << std::endl << '\t' << help; };
 		}
 
 		bool parsevals(RawArgs &args) override
@@ -283,6 +288,31 @@ namespace argparse
 		}
 	};
 
+	//remainder of args
+	template<>
+	struct TypedArg<char*, Remainder>: public Arg
+	{
+		struct Remain
+		{
+			char **argv;
+			int argc;
+		};
+		Remain value;
+		Remain& ref() { return value; }
+		TypedArg(const char *name, const char *help="", Remain v={}, bool required=false):
+			Arg(name, help, false),
+			value(v)
+		{}
+
+		void countsym(std::ostream &o) override { o << "**"; }
+		bool parsevals(RawArgs &args) override
+		{
+			value.argv = args.argv;
+			value.argc = args.argc;
+			args.clear();
+			return true;
+		}
+	};
 
 	template<class T, class V>
 	struct is_type { static const bool value = false; };
@@ -365,14 +395,20 @@ namespace argparse
 			doshort(program);
 			std::cerr << std::endl;
 			if (help[0])
-			{ std::cerr << help << std::endl << std::endl; }
+			{ std::cerr << help << std::endl; }
+			if (flags.size()) { std::cerr << std::endl << "Flags:" << std::endl; }
 			for (auto *flag: flags)
 			{
-				flag->helplong(std::cerr, prefix);
+				std::cerr << "  ";
+				flag->helpshort(std::cerr, prefix);
+				flag->helplong(std::cerr);
 				std::cerr << std::endl;
 			}
+			if (positionals.size()) { std::cerr << std::endl << "Positionals:" << std::endl; }
 			for (auto *pos: positionals)
 			{
+				std::cerr << "  ";
+				pos->helpshort(std::cerr);
 				pos->helplong(std::cerr);
 				std::cerr << std::endl;
 			}

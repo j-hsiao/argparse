@@ -2,6 +2,7 @@
 #include <cassert>
 #include <iostream>
 #include <vector>
+#include <string>
 
 int main(int argc, char *argv[])
 {
@@ -38,51 +39,62 @@ int main(int argc, char *argv[])
 		auto &fpvalm = p.add<float, -1>("fpvalm", "float positional multi");
 		auto &ipvalm = p.add<int, -1>("ipvalm", "int positional multi");
 
-		char rawargs[][10] = {
-			"prog", pre "ffval", "2.5", pre "ifval", " -32", pre "ffvalf",
-			pre pre "1", "-0.5", "0.125", pre "ifvalf", "1", "2", pre "ffvalm",
-			"0.75", "0.5", "0.25", pre "ifvalm", "52", "69", "42", "15",
-			pre "bfvalt", pre "bfvalc", pre"bfvalc", pre"bfvalc",
-			"25.5", "73", "69.5", "69.25", "1024", "4096", "1.25", "2.25", "3.25",
-			pre "bfvalt", pre "bfvalt", "1", "2", "3", "4"
-		};
-		const std::size_t nargs = sizeof(rawargs) / 10u;
-		char *argstrs[nargs];
-		for (std::size_t i = 0; i<nargs; ++i)
-		{ argstrs[i] = rawargs[i]; }
+		if (argc < 2)
+		{
+			char rawargs[][10] = {
+				"prog", pre "ffval", "2.5", pre "ifval", " -32", pre "ffvalf",
+				pre pre "1", "-0.5", "0.125", pre "ifvalf", "1", "2", pre "ffvalm",
+				"0.75", "0.5", "0.25", pre "ifvalm", "52", "69", "42", "15",
+				pre "bfvalt", pre "bfvalc", pre"bfvalc", pre"bfvalc",
+				"25.5", "73", "69.5", "69.25", "1024", "4096", "1.25", "2.25", "3.25",
+				pre "bfvalt", pre "bfvalt", "1", "2", "3", "4"
+			};
+			const std::size_t nargs = sizeof(rawargs) / 10u;
+			char *argstrs[nargs];
+			for (std::size_t i = 0; i<nargs; ++i)
+			{ argstrs[i] = rawargs[i]; }
 
-		assert(!p.parse(nargs, argstrs));
-		assert(ffval == 2.5f);
-		assert(ifval == -32);
-		assert(ffvalf.size() == 2);
-		assert(ffvalf[0] == -0.5f);
-		assert(ffvalf[1] == 0.125f);
-		assert(ifvalf.size() == 2);
-		assert(ifvalf[0] == 1);
-		assert(ifvalf[1] == 2);
-		assert(ffvalm.size() == 3);
-		assert(ffvalm[0] == 0.75f);
-		assert(ffvalm[1] == 0.5f);
-		assert(ffvalm[2] == 0.25f);
-		assert(ifvalm[0] == 52);
-		assert(ifvalm[1] == 69);
-		assert(ifvalm[2] == 42);
-		assert(ifvalm[3] == 15);
-		assert(bfvalt);
-		assert(bfvalc == 3);
-		assert(fpval == 25.5f);
-		assert(ipval == 73);
-		assert(fpvalf[0] == 69.5);
-		assert(fpvalf[1] == 69.25);
-		assert(ipvalf[0] == 1024);
-		assert(ipvalf[1] == 4096);
-		assert(fpvalm.size() == 3);
-		assert(fpvalm[0] == 1.25f);
-		assert(fpvalm[1] == 2.25f);
-		assert(fpvalm[2] == 3.25f);
-		assert(ipvalm.size() == 4);
-		for (int i=0; i<ipvalm.size(); ++i)
-		{ assert(ipvalm[i] == i+1); }
+			char hargs[] = pre pre "help";
+			char *hargp = hargs+1;
+			assert(p.parse(1, &hargp, hargp));
+			hargp = hargs;
+			assert(p.parse(1, &hargp, hargp));
+
+			assert(!p.parse(nargs, argstrs));
+			assert(ffval == 2.5f);
+			assert(ifval == -32);
+			assert(ffvalf.size() == 2);
+			assert(ffvalf[0] == -0.5f);
+			assert(ffvalf[1] == 0.125f);
+			assert(ifvalf.size() == 2);
+			assert(ifvalf[0] == 1);
+			assert(ifvalf[1] == 2);
+			assert(ffvalm.size() == 3);
+			assert(ffvalm[0] == 0.75f);
+			assert(ffvalm[1] == 0.5f);
+			assert(ffvalm[2] == 0.25f);
+			assert(ifvalm[0] == 52);
+			assert(ifvalm[1] == 69);
+			assert(ifvalm[2] == 42);
+			assert(ifvalm[3] == 15);
+			assert(bfvalt);
+			assert(bfvalc == 3);
+			assert(fpval == 25.5f);
+			assert(ipval == 73);
+			assert(fpvalf[0] == 69.5);
+			assert(fpvalf[1] == 69.25);
+			assert(ipvalf[0] == 1024);
+			assert(ipvalf[1] == 4096);
+			assert(fpvalm.size() == 3);
+			assert(fpvalm[0] == 1.25f);
+			assert(fpvalm[1] == 2.25f);
+			assert(fpvalm[2] == 3.25f);
+			assert(ipvalm.size() == 4);
+			for (int i=0; i<ipvalm.size(); ++i)
+			{ assert(ipvalm[i] == i+1); }
+		}
+		else
+		{ p.parse(argc, argv); }
 	}
 #define SETUP \
 	argparse::Parser p("test argument parsing", pre); \
@@ -102,6 +114,18 @@ int main(int argc, char *argv[])
 		assert(!p.parse(args.size(), &args[0], argv[0]));
 		assert(ttoggled && !ftoggled);
 	}
+	{
+		argparse::Parser p("", pre);
+		auto &initial = p.add<std::string>("initial");
+		auto &remainder = p.add<char*, argparse::Remainder>("remain");
 
+		char buf[][20] = {"initial value", pre pre, pre "help"};
+		char *args[] = {buf[0], buf[1], buf[2]};
+
+		assert(!p.parse(3, args, buf[0]));
+		assert(initial == "initial value");
+		assert(remainder.argc == 1);
+		assert(remainder.argv[0] == std::string(pre "help"));
+	}
 	return 0;
 }
