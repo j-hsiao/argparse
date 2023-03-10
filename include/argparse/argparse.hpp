@@ -1,15 +1,31 @@
 //Argument parsing helpers
 //
-// Parser p()
+// Parser p(const char *help="", const char *prefix="-", int base=10);
+// auto &thing = p.add<type, count=1>(name, help="", default_value={}):
+//   type count
+//   bool 0  : toggle bool flag (-flag -flag -> the default value was)
+//   bool 1  : count bool flag instances (-flag -flag -> default + 2)
+//   T    -1 : vector (variable, multi)
+//   T    1  : single value of type.
+//   T    N>1: std::array (multi, fixed count)
 //
-// p.add<type, count>(name, help, defaults):
-//   bool: 0: toggle, 1: count, otherwise, same as others:
-//   others: 1+->array, -1 = vector
+//   missing default value will make the arg required.
+//   For non-required multi arguments, premature ending of parsing is
+//   allowed.  (The remaining unparsed values just use the defaults).
+// bool p.parse(int argc, char *argv[])
+// bool p.parse(int argc, char *argv[], const char *program_name);
+//   If programname is not given, expect it to be argv[0], just like
+//   argc and argv passed to main().
 //
-// missing default value will make the arg required.
+//   true if parsing succeeded:
+//   if (!p.parse(...)) { return 1; }
+//   // do stuff in main()
 //
-// lazy, no map because 1. simpler, 2. how many args would you add?
-// shouldn't affect performance much.
+// Parsed values are stored in the returned references.
+// The lifetime the references is the same as the parser.
+// Parsing uses internal state which may change default values
+// of subsequent parses.  Help flags are searched first, and if they
+// exist, then no values should change.
 //
 // help notation:
 //   (xN): fixed N arguments
@@ -21,12 +37,13 @@
 // later flags will overwrite newer flags.
 #ifndef ARGPARSE_HPP
 #define ARGPARSE_HPP
+#include "argparse/nums.hpp"
+
 #include <array>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
 #include <string>
-#include <sstream>
 #include <vector>
 
 namespace argparse
@@ -38,16 +55,17 @@ namespace argparse
 		const char *prefix;
 		int argc;
 		std::size_t offset;
-		int flagskip;
+		int flagskip, base;
 		//argc: arg count.
 		//argv: argument values.
 		//prefix: flag prefix.
-		RawArgs(int argc, char *argv[], const char *prefix="-"):
+		RawArgs(int argc, char *argv[], const char *prefix="-", int base=10):
 			argv(argv),
 			prefix(prefix),
 			argc(argc),
 			offset(argc>0 ? std::strspn(*argv, prefix) : 0),
-			flagskip(0)
+			flagskip(0),
+			base(base)
 		{ if (offset == 2) { calcskip(); } }
 
 		void clear() { argc = 0; }
@@ -56,10 +74,8 @@ namespace argparse
 		{
 			if (argv[0][2])
 			{
-				std::stringstream s(argv[0] + offset);
-				s >> flagskip;
-				//on failure, 0 is written to value?
-				if (flagskip > 0) { ++flagskip; }
+				if (store(flagskip, argv[0]+offset, base) && flagskip > 0)
+				{ ++flagskip; }
 				else { flagskip = 0; }
 			}
 			else
@@ -108,19 +124,15 @@ namespace argparse
 		//store to a destination.
 		//because lazy so use stringstream
 		template<class T>
-		void to(T &dst)
-		{
-			std::stringstream s(*argv);
-			s >> dst;
-		}
+		bool to(T &dst) { return store(dst, *argv, base); }
 	};
 	template<>
-	void RawArgs::to<const char*>(const char* &ptr) { ptr = *argv; }
+	bool RawArgs::to<const char*>(const char* &ptr) { ptr = *argv; return true; }
 	template<>
-	void RawArgs::to<char*>(char* &ptr) { ptr = *argv; }
+	bool RawArgs::to<char*>(char* &ptr) { ptr = *argv; return true; }
 	//if arg contains spaces, stringstream would only store up to space.
 	template<>
-	void RawArgs::to<std::string>(std::string &out) { out = *argv; }
+	bool RawArgs::to<std::string>(std::string &out) { out = *argv; return true; }
 
 
 	struct Arg
@@ -200,13 +212,8 @@ namespace argparse
 		{
 			for (int i=0; i<N; ++i, args.step())
 			{
-				if (args && !args.isflag())
-				{ args.to(value[i]); }
-				else
-				{
-					//partial args if not required.
-					return !required;
-				}
+				if (!(args && !args.isflag() && args.to(value[i])))
+				{ return !required; }
 			}
 			return true;
 		}
@@ -277,10 +284,9 @@ namespace argparse
 		bool parsevals(RawArgs &args) override
 		{
 			value.clear();
-			while (args && !args.isflag())
+			T val;
+			while (args && !args.isflag() && args.to(val))
 			{
-				T val;
-				args.to(val);
 				value.push_back(val);
 				args.step();
 			}
@@ -325,9 +331,13 @@ namespace argparse
 		std::vector<Arg*> positionals;
 		const char *help;
 		const char *prefix;
+		int base;
 
-		Parser(const char *help="", const char *prefix="-"):
-			help(help), prefix(prefix)
+		//help: help str for parser
+		//prefix: prefix for flags
+		//base: base for number parsing.
+		Parser(const char *help="", const char *prefix="-", int base=10):
+			help(help), prefix(prefix), base(base)
 		{}
 
 		template<class T, int N=1>
@@ -375,7 +385,7 @@ namespace argparse
 			return best;
 		}
 
-		void doshort(char *program)
+		void doshort(const char *program)
 		{
 			std::cerr << "Usage: " << program;
 			for (auto *flag: flags)
@@ -390,7 +400,7 @@ namespace argparse
 			}
 			std::cerr << std::endl;
 		}
-		void dolong(char *program)
+		void dolong(const char *program)
 		{
 			doshort(program);
 			std::cerr << std::endl;
@@ -413,7 +423,7 @@ namespace argparse
 				std::cerr << std::endl;
 			}
 		}
-		bool dohelp(int argc, char *argv[], char *program)
+		bool dohelp(int argc, char *argv[], const char *program)
 		{
 			int minscore = 0;
 			for (Arg *flag : flags)
@@ -421,7 +431,7 @@ namespace argparse
 				for (int i=0; i<4 && flag->name[i] == ("help")[i] && i >= minscore; ++i)
 				{ minscore = i+1; }
 			}
-			RawArgs args(argc, argv, prefix);
+			RawArgs args(argc, argv, prefix, base);
 			std::size_t level = 0;
 			while (args)
 			{
@@ -446,11 +456,11 @@ namespace argparse
 		}
 
 		//Parse without program in argv.
-		bool parse(int argc, char *argv[], char *program)
+		bool parse(int argc, char *argv[], const char *program)
 		{
 			//args are mutated from parsing, so must search for help first.
-			if (dohelp(argc, argv, program)) { return true; }
-			RawArgs args(argc, argv, prefix);
+			if (dohelp(argc, argv, program)) { return false; }
+			RawArgs args(argc, argv, prefix, base);
 			auto pit = positionals.begin();
 			while (args)
 			{
@@ -474,14 +484,14 @@ namespace argparse
 							std::cerr << "Missing arguments for \""
 								<< curarg->name << '"' << std::endl;
 						}
-						return true;
+						return false;
 					}
 				}
 				else
 				{
 					std::cerr << "unrecognized " << (isflag ? "flag" : "positional")
 						<< " \"" << args.argv[0] << '"' << std::endl;
-					return true;
+					return false;
 				}
 			}
 			while (pit != positionals.end())
@@ -490,7 +500,7 @@ namespace argparse
 				{
 					std::cerr << "Missing required positional \""
 						<< (*pit)->name << '"' << std::endl;
-					return true;
+					return false;
 				}
 				++pit;
 			}
@@ -500,10 +510,10 @@ namespace argparse
 				{
 					std::cerr << "Missing required flag \"" << prefix << flag->name
 						<< '"' << std::endl;
-					return true;
+					return false;
 				}
 			}
-			return false;
+			return true;
 		}
 
 		~Parser()

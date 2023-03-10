@@ -56,11 +56,11 @@ int main(int argc, char *argv[])
 
 			char hargs[] = pre pre "help";
 			char *hargp = hargs+1;
-			assert(p.parse(1, &hargp, hargp));
+			assert(!p.parse(1, &hargp, hargp));
 			hargp = hargs;
-			assert(p.parse(1, &hargp, hargp));
+			assert(!p.parse(1, &hargp, hargp));
 
-			assert(!p.parse(nargs, argstrs));
+			assert(p.parse(nargs, argstrs));
 			assert(ffval == 2.5f);
 			assert(ifval == -32);
 			assert(ffvalf.size() == 2);
@@ -105,13 +105,13 @@ int main(int argc, char *argv[])
 	{
 		SETUP;
 		std::vector<char*> args = {t, t, t, f, f, f};
-		assert(!p.parse(args.size(), &args[0], argv[0]));
+		assert(p.parse(args.size(), &args[0], argv[0]));
 		assert(!ttoggled && ftoggled);
 	}
 	{
 		SETUP;
 		std::vector<char*> args = {t, f, t, f};
-		assert(!p.parse(args.size(), &args[0], argv[0]));
+		assert(p.parse(args.size(), &args[0], argv[0]));
 		assert(ttoggled && !ftoggled);
 	}
 	{
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 		char buf[][20] = {"initial value", pre pre, pre "help"};
 		char *args[] = {buf[0], buf[1], buf[2]};
 
-		assert(!p.parse(3, args, buf[0]));
+		assert(p.parse(3, args, buf[0]));
 		assert(initial == "initial value");
 		assert(remainder.argc == 1);
 		assert(remainder.argv[0] == std::string(pre "help"));
