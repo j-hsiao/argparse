@@ -16,38 +16,33 @@ namespace argparse
 	inline bool borderval(unsigned long val) { return val == ULONG_MAX; }
 	inline bool borderval(unsigned long long val) { return val == ULLONG_MAX; }
 
-	template<class T>
-	T rawcvt(const char *args, char **end, int base);
-	template<> float rawcvt<float>(const char *args, char **end, int base)
-	{ return std::strtof(args, end); }
-	template<> double rawcvt<double>(const char *args, char **end, int base)
-	{ return std::strtod(args, end); }
-	template<> long double rawcvt<long double>(const char *args, char **end, int base)
-	{ return std::strtold(args, end); }
-	template<> long rawcvt<long>(const char *args, char **end, int base)
-	{ return std::strtol(args, end, base); }
-	template<> long long rawcvt<long long>(const char *args, char **end, int base)
-	{ return std::strtoll(args, end, base); }
-	template<> unsigned long rawcvt<unsigned long>(const char *args, char **end, int base)
-	{ return std::strtoul(args, end, base); }
-	template<> unsigned long long rawcvt<unsigned long long>(const char *args, char **end, int base)
-	{ return std::strtoull(args, end, base); }
+	void rawcvt(float &dst, const char *args, char **end, int base)
+	{ dst = std::strtof(args, end); }
+	void rawcvt(double &dst, const char *args, char **end, int base)
+	{ dst = std::strtod(args, end); }
+	void rawcvt(long double &dst, const char *args, char **end, int base)
+	{ dst =  std::strtold(args, end); }
+	void rawcvt(long &dst, const char *args, char **end, int base)
+	{ dst = std::strtol(args, end, base); }
+	void rawcvt(long long &dst, const char *args, char **end, int base)
+	{ dst = std::strtoll(args, end, base); }
+	void rawcvt(unsigned long &dst, const char *args, char **end, int base)
+	{ dst = std::strtoul(args, end, base); }
+	void rawcvt(unsigned long long &dst, const char *args, char **end, int base)
+	{ dst = std::strtoull(args, end, base); }
 
 	template<class T>
 	bool store(T &dst, const char *arg, int base=10)
 	{
 		char *end = nullptr;
 		errno = 0;
-		dst = rawcvt<T>(arg, &end, base);
+		rawcvt(dst, arg, &end, base);
 		//example uses this but docs don't explicitly say sets to arg.
 		if (end != arg && !(borderval(dst) && errno == ERANGE))
 		{
-			while (*end)
-			{
-				if (!std::isspace(*end)) { return false; }
-				++end;
-			}
-			return true;
+			//ensure no trailing invalid data.
+			while (std::isspace(*end)) { ++end; }
+			return !*end;
 		}
 		return false;
 	}

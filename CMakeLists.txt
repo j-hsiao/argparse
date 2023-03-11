@@ -9,6 +9,9 @@ target_include_directories(
 add_executable(demo EXCLUDE_FROM_ALL test/test.cpp)
 target_link_libraries(demo PUBLIC argparse)
 
+add_executable(nums EXCLUDE_FROM_ALL test/nums.cpp)
+target_link_libraries(nums PUBLIC argparse)
+
 install(
 	DIRECTORY include/argparse
 	DESTINATION include
