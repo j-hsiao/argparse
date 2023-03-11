@@ -55,6 +55,13 @@ int main(int argc, char *argv[])
 
 		if (argc < 2)
 		{
+			char hargs[] = pre "help";
+			char *hargp = hargs;
+			hargs[2] = '\0';
+			assert(!p.parse(1, &hargp, hargp));
+			hargs[2] = 'e';
+			assert(!p.parse(1, &hargp, hargp));
+
 			char rawargs[][10] = {
 				"prog", pre "ffval", "2.5", pre "ifval", " -32", pre "ffvalf",
 				pre pre "1", "-0.5", "0.125", pre "ifvalf", "1", "2", pre "ffvalm",
@@ -63,18 +70,8 @@ int main(int argc, char *argv[])
 				"25.5", "73", "69.5", "69.25", "1024", "4096", "1.25", "2.25", "3.25",
 				pre "bfvalt", pre "bfvalt", "1", "2", "3", "4"
 			};
-			const std::size_t nargs = sizeof(rawargs) / 10u;
-			char *argstrs[nargs];
-			for (std::size_t i = 0; i<nargs; ++i)
-			{ argstrs[i] = rawargs[i]; }
-
-			char hargs[] = pre pre "help";
-			char *hargp = hargs+1;
-			assert(!p.parse(1, &hargp, hargp));
-			hargp = hargs;
-			assert(!p.parse(1, &hargp, hargp));
-
-			assert(p.parse(nargs, argstrs));
+			charp args(rawargs, sizeof(rawargs));
+			assert(p.parse(args.argc(), args.argv()));
 			assert(ffval == 2.5f);
 			assert(ifval == -32);
 			assert(ffvalf.size() == 2);
@@ -151,6 +148,34 @@ int main(int argc, char *argv[])
 		assert(p.parse(args.argc(), args.argv()));
 		assert(b);
 		assert(i==-69);
+	}
+	{
+		{
+			argparse::Parser p("", pre);
+			auto &h1 = p.add<int>("--help", "full", {69});
+			auto &h2 = p.add<int>("-helper", "partial", {70});
+			char bufs[][20] = {"-help", "20"};
+			charp args(bufs, sizeof(bufs));
+			assert(p.parse(args.argc(), args.argv(), ""));
+			assert(h1 == 20 && h2 == 70);
+		}
+		{
+			argparse::Parser p("", pre);
+			auto &h1 = p.add<int>("--help", "full", {69});
+			auto &h2 = p.add<int>("-helper", "partial", {70});
+			char bufs[][20] = {"--help", "20"};
+			charp args(bufs, sizeof(bufs));
+			assert(!p.parse(args.argc(), args.argv(), ""));
+		}
+		{
+			argparse::Parser p("", pre);
+			auto &h1 = p.add<int>("--help", "full", {69});
+			auto &h2 = p.add<int>("-helper", "partial", {70});
+			char bufs[][20] = {"-he", "20"};
+			charp args(bufs, sizeof(bufs));
+			assert(p.parse(args.argc(), args.argv(), ""));
+			assert(h1 == 69 && h2 == 20);
+		}
 	}
 	return 0;
 }

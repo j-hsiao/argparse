@@ -22,7 +22,7 @@
 //   Otherwise, it is a positional argument.  Flags will be arguments
 //   given by first specifying the flag and then any values afterwards.
 //   Positional arguments are parsed by their position in the argument
-//   list.
+//   list.  Multi arg sequences will be interrupted by flags.
 //   Flag matching follows these rules:
 //     1. First full match.
 //     2. If no full matches are found, then partial matches will be
@@ -30,10 +30,13 @@
 //        prefix char.  Multiple partial matches will cause parsing
 //        to fail.
 //
-//    Special flags can be given consisting of exactly 2 prefix chars
-//    and an optional number.  These flags will indicate that the
-//    next N arguments are not to be treated as flags.  If the number
-//    is omitted, all remaining arguments are positionals.
+//    If arguments have exactly 2 prefix chars, then they may be handled
+//    differently.  If the prefix chars are followed by an int, then it
+//    will be parsed.  If it is a positive number N, the following
+//    N arguments will be treated as positional arguments.  If there is
+//    nothing afterwards, treat all remaining args as positional.
+//    Finally, flag names following exactly 2 prefix chars will
+//    preferentially match with help.
 //
 // bool p.parse(int argc, char *argv[])
 // bool p.parse(int argc, char *argv[], const char *program_name);
@@ -142,6 +145,7 @@ namespace argparse
 	{
 		const char *name;
 		const char *help;
+		bool required;
 
 		Arg(const char *name, const char *help="", bool required=false):
 			name(name), help(help), required(required)
@@ -171,9 +175,9 @@ namespace argparse
 	};
 
 	template<class T, int N>
-	struct rtype { std::array<T, N>& get(std::array<T, N> &arr) { return arr; } };
+	struct rtype { static std::array<T, N>& get(std::array<T, N> &arr) { return arr; } };
 	template<class T>
-	struct rtype<T, 1> { T& get(std::array<T, 1> &arr) { return arr[0]; } };
+	struct rtype<T, 1> { static T& get(std::array<T, 1> &arr) { return arr[0]; } };
 
 	//fixed args
 	template<class T, int N=1>
@@ -270,7 +274,7 @@ namespace argparse
 			if (!required)
 			{
 				o << " (";
-				for (v : value) { o << v << ", "; }
+				for (const auto &v : value) { o << v << ", "; }
 				o << ")";
 			}
 		}
@@ -319,6 +323,7 @@ namespace argparse
 	template<class T>
 	struct is_type<T, T> { static const bool value = true; };
 
+	static const char Help[] = "help";
 	struct Parser
 	{
 		std::vector<Arg*> flags;
@@ -326,13 +331,16 @@ namespace argparse
 		std::vector<Arg*> positionals;
 		const char *help;
 		const char *prefix;
+		std::ostream *logstream;
+		std::size_t helplevel;
 		int base;
+		bool helpmask[4];
 
 		//help: help str for parser
 		//prefix: prefix for flags
 		//base: base for number parsing.
-		Parser(const char *help="", const char *prefix="-", int base=10):
-			help(help), prefix(prefix), base(base)
+		Parser(const char *help="", const char *prefix="-", int base=10, std::ostream *logstream=&std::cerr):
+			help(help), prefix(prefix), logstream(logstream), helplevel(0), base(base)
 		{}
 
 		template<class T, int N=1>
@@ -343,8 +351,22 @@ namespace argparse
 			if (is_type<T, bool>::value && (N == 0 || N == 1) && !offset)
 			{ throw std::logic_error("Single bool args should be flags."); }
 			auto *ptr = new TypedArg<T, N>(name+offset, help, value, required);
-			if (offset > 1) { fflags.push_back(ptr); }
-			else if (offset) { flags.push_back(ptr); }
+			if (offset > 1)
+			{
+				fflags.push_back(ptr);
+				const char *check = name+offset;
+				int i = 0;
+				while (Help[i] && check[i] == Help[i]) { ++i; }
+				if (i && !check[i]) { helpmask[i-1] = 1; }
+			}
+			else if (offset)
+			{
+				flags.push_back(ptr);
+				const char *check = name+offset;
+				int i=0;
+				while (Help[i] && check[i] == Help[i])
+				{ helpmask[i++] = 1; }
+			}
 			else { positionals.push_back(ptr); }
 			return ptr->ref();
 		}
@@ -358,7 +380,7 @@ namespace argparse
 		{ return add<T,N>(name, help, value, false); }
 
 		//Search for a matching flag.
-		Arg* findflag(RawArgs &args, std::ostream &o)
+		Arg* findflag(RawArgs &args)
 		{
 			for (Arg *cand: fflags)
 			{ if (args.prefixes(cand->name) == args.Full) { return cand; } }
@@ -369,15 +391,12 @@ namespace argparse
 				if (int val = args.prefixes(cand->name))
 				{
 					if (val == args.Full) { return cand; }
-					++count;
-					best = cand;
+					if (!(count++)) { best = cand; }
+					else { best = nullptr; }
 				}
 			}
-			if (count > 1)
-			{
-				o << "Ambiguous argument found" << std::endl;
-				return nullptr;
-			}
+			if (count > 1 && logstream)
+			{ *logstream << "Ambiguous flag: " << args.argv[0] << std::endl; }
 			return best;
 		}
 
@@ -395,7 +414,7 @@ namespace argparse
 			doshort(program, o);
 			if (help[0]) { o << std::endl << help << std::endl; }
 			if (flags.size() || fflags.size()) { o << std::endl << "Flags:" << std::endl; }
-			for (auto &flaglist : {flags, fflags})
+			for (auto &flaglist : {fflags, flags})
 			{
 				for (auto *flag: flaglist)
 				{
@@ -413,34 +432,29 @@ namespace argparse
 			}
 		}
 		//return whether help was done.
-		bool dohelp(int argc, char *argv[], const char *program, std::ostream &o)
+		bool dohelp(int argc, char *argv[], const char *program)
 		{
-			for (Arg *flag : fflags)
-			{ if (std::strcmp(flag->name, "help") == 0) { return false; } }
-			int minscore = 0;
-			for (Arg *flag : flags)
-			{
-				int i = 0;
-				while (flag->name[i] && flag->name[i] == ("help")[i]) { ++i; }
-				if (i == 4 && !flag->name[i]) { return false; }
-				if (i > minscore) { minscore = i; }
-			}
 			RawArgs args(argc, argv, prefix, base);
-			std::size_t level = 0;
+			helplevel = 0;
 			for (; args; args.step())
 			{
 				if (args.isflag)
 				{
 					const char *arg = args.argv[0] + args.isflag;
-					int i = 0;
-					while (arg[i] && arg[i] == ("help")[i]) { ++i; }
-					if (!arg[i] && i > minscore && args.isflag > level)
-					{ level = args.isflag; }
+					std::size_t i = 0;
+					while (Help[i] && arg[i] == Help[i]) { ++i; }
+					if (
+						i && !arg[i] && (!helpmask[i-1] || args.isflag == 2)
+						&& i > helplevel)
+					{ helplevel = i; }
 				}
 			}
-			if (level >= 2) { dolong(program, o); }
-			else if (level >= 1) { doshort(program, o); }
-			return level > 0;
+			if (logstream)
+			{
+				if (helplevel >= 4) { dolong(program, *logstream); }
+				else if (helplevel > 0) { doshort(program, *logstream); }
+			}
+			return helplevel > 0;
 		}
 
 		// The program name should be argv[0].
@@ -460,12 +474,11 @@ namespace argparse
 			while (args)
 			{
 				Arg *curarg = nullptr;
-				bool isflag = args.isflag();
-				if (isflag) { curarg = findflag(args); }
+				if (args.isflag) { if (!(curarg = findflag(args))) { return false; } }
 				else if (pit != positionals.end()) { curarg = *(pit++); }
 				if (curarg)
 				{
-					if (isflag) { args.step(); }
+					if (args.isflag) { args.step(); }
 					if (!curarg->parse(args))
 					{
 						if (args)
@@ -484,28 +497,31 @@ namespace argparse
 				}
 				else
 				{
-					std::cerr << "unrecognized " << (isflag ? "flag" : "positional")
+					std::cerr << "unrecognized " << (args.isflag ? "flag" : "positional")
 						<< " \"" << args.argv[0] << '"' << std::endl;
 					return false;
 				}
 			}
 			while (pit != positionals.end())
 			{
-				if ((*pit)->required)
+				if (!(*pit)->parse(args))
 				{
-					std::cerr << "Missing required positional \""
+					std::cerr << "Missing arguments for \""
 						<< (*pit)->name << '"' << std::endl;
 					return false;
 				}
 				++pit;
 			}
-			for (Arg *flag : flags)
+			for (auto &flaglist : {fflags, flags})
 			{
-				if (flag->required)
+				for (Arg *flag : flaglist)
 				{
-					std::cerr << "Missing required flag \"" << prefix << flag->name
-						<< '"' << std::endl;
-					return false;
+					if (flag->required)
+					{
+						std::cerr << "Missing required flag \"" << prefix << flag->name
+							<< '"' << std::endl;
+						return false;
+					}
 				}
 			}
 			return true;
