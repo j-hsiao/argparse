@@ -50,8 +50,8 @@ int main(int argc, char *argv[])
 		auto &ipvalf = p.add<int, 2>("ipvalf", "int positional fixed");
 
 		//multi
-		auto &fpvalm = p.add<float, -1>("fpvalm", "float positional multi");
 		auto &ipvalm = p.add<int, -1>("ipvalm", "int positional multi");
+		auto &fpvalm = p.add<float, -1>("fpvalm", "float positional multi");
 
 		if (argc < 2)
 		{
@@ -67,8 +67,8 @@ int main(int argc, char *argv[])
 				pre pre "1", "-0.5", "0.125", pre "ifvalf", "1", "2", pre "ffvalm",
 				"0.75", "0.5", "0.25", pre "ifvalm", "52", "69", "42", "15",
 				pre "bfvalt", pre "bfvalc", pre"bfvalc", pre"bfvalc",
-				"25.5", "73", "69.5", "69.25", "1024", "4096", "1.25", "2.25", "3.25",
-				pre "bfvalt", pre "bfvalt", "1", "2", "3", "4"
+				"25.5", "73", "69.5", "69.25", "1024", "4096", "1", "2", "3", "4",
+				"1.25", "2.25", "3.25"
 			};
 			charp args(rawargs, sizeof(rawargs));
 			assert(p.parse(args.argc(), args.argv()));
@@ -96,13 +96,12 @@ int main(int argc, char *argv[])
 			assert(fpvalf[1] == 69.25);
 			assert(ipvalf[0] == 1024);
 			assert(ipvalf[1] == 4096);
-			assert(fpvalm.size() == 3);
-			assert(fpvalm[0] == 1.25f);
-			assert(fpvalm[1] == 2.25f);
-			assert(fpvalm[2] == 3.25f);
 			assert(ipvalm.size() == 4);
 			for (int i=0; i<ipvalm.size(); ++i)
 			{ assert(ipvalm[i] == i+1); }
+			assert(fpvalm.size() == 3);
+			for (int i=0; i<fpvalm.size(); ++i)
+			{ assert(fpvalm[i] == (i+1) + 0.25f); }
 		}
 		else
 		{ p.parse(argc, argv); }

@@ -24,11 +24,15 @@
 //   Positional arguments are parsed by their position in the argument
 //   list.  Multi arg sequences will be interrupted by flags.
 //   Flag matching follows these rules:
-//     1. First full match.
-//     2. If no full matches are found, then partial matches will be
+//     1. First exact match.  Multi-prefix char flags are searched first.
+//        Otherwise, flags are searched in the same order as they were
+//        added.
+//     2. If no exact matches are found, then partial matches will be
 //        checked for flags that were specified with only a single
 //        prefix char.  Multiple partial matches will cause parsing
-//        to fail.
+//        to fail (ambiguous flag).
+//     NOTE: it is the user's responsibility to ensure no flags have
+//     identical names.
 //
 //    If arguments have exactly 2 prefix chars, then they may be handled
 //    differently.  If the prefix chars are followed by an int, then it
@@ -36,7 +40,11 @@
 //    N arguments will be treated as positional arguments.  If there is
 //    nothing afterwards, treat all remaining args as positional.
 //    Finally, flag names following exactly 2 prefix chars will
-//    preferentially match with help.
+//    preferentially match with help.  That is to say, "--h", "--he",
+//    "--hel", and "--help" will always trigger the help message even if
+//    you add an argument flag called help.  Only a flag with the full
+//    "help" will trigger a full help message.  Otherwise, a short help
+//    message will be written.
 //
 // bool p.parse(int argc, char *argv[])
 // bool p.parse(int argc, char *argv[], const char *program_name);
