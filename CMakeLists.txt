@@ -1,49 +1,58 @@
 cmake_minimum_required(VERSION 3.0)
-project(argparse VERSION 0.2 LANGUAGES CXX)
-add_library(argparse INTERFACE)
+project(argparse VERSION 0.3 LANGUAGES CXX)
+add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(
-	argparse
+	${PROJECT_NAME}
 	INTERFACE
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
 	$<INSTALL_INTERFACE:include>)
-add_executable(demo EXCLUDE_FROM_ALL test/test.cpp)
-target_link_libraries(demo PUBLIC argparse)
-
-add_executable(nums EXCLUDE_FROM_ALL test/nums.cpp)
-target_link_libraries(nums PUBLIC argparse)
 
 install(
-	DIRECTORY include/argparse
+	DIRECTORY include/${PROJECT_NAME}
 	DESTINATION include
 )
 install(
-	TARGETS argparse
-	EXPORT argparseTargets
+	TARGETS ${PROJECT_NAME}
+	EXPORT ${PROJECT_NAME}
 )
 install(
-	EXPORT argparseTargets
-	FILE argparseTargets.cmake
-	DESTINATION share/cmake/argparse
-	NAMESPACE argparse::
+	EXPORT ${PROJECT_NAME}
+	FILE ${PROJECT_NAME}Config.cmake
+	DESTINATION share/cmake/${PROJECT_NAME}
+	NAMESPACE ${PROJECT_NAME}::
 )
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
-	argparse/argparseConfigVersion.cmake
+	${CMAKE_BINARY_DIR}/share/cmake/${PROJECT_NAME}/${PROJECT_NAME}ConfigVersion.cmake
 	COMPATIBILITY SameMajorVersion
 )
-if (NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/argparse/argparseConfig.cmake")
-	file(
-		WRITE "${CMAKE_CURRENT_BINARY_DIR}/argparse/argparseConfig.cmake"
-		"include(\"\${CMAKE_CURRENT_LIST_DIR}/argparseTargets.cmake\")\n")
-endif()
 export(
-	EXPORT argparseTargets
-	FILE argparse/argparseTargets.cmake
-	NAMESPACE argparse::
+	EXPORT ${PROJECT_NAME}
+	FILE ${CMAKE_BINARY_DIR}/share/cmake/${PROJECT_NAME}/${PROJECT_NAME}Config.cmake
+	NAMESPACE ${PROJECT_NAME}::
 )
-file(GLOB packagefiles "${CMAKE_CURRENT_BINARY_DIR}/argparse/argparseConfig*.cmake")
 install(
 	FILES
-	${packagefiles}
-	DESTINATION share/cmake/argparse)
+	${CMAKE_BINARY_DIR}/share/cmake/${PROJECT_NAME}/${PROJECT_NAME}ConfigVersion.cmake
+	DESTINATION share/cmake/${PROJECT_NAME})
+add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+
+include(CTest)
+if (BUILD_TESTING)
+	add_executable(demo test/test.cpp)
+	target_link_libraries(demo PUBLIC ${PROJECT_NAME})
+
+	add_executable(nums test/nums.cpp)
+	target_link_libraries(nums PUBLIC ${PROJECT_NAME})
+
+	add_executable(arg test/arg.cpp)
+	target_link_libraries(arg PUBLIC ${PROJECT_NAME})
+	add_test(NAME arg COMMAND arg)
+	target_include_directories(arg PRIVATE test/include)
+
+	add_executable(argiter test/argiter.cpp)
+	target_link_libraries(argiter PUBLIC ${PROJECT_NAME})
+	add_test(NAME argiter COMMAND argiter)
+	target_include_directories(argiter PRIVATE test/include)
+endif()

@@ -1,3 +1,4 @@
+//Parsing numbers from char*
 #ifndef ARGPARSE_CONVERT_HPP
 #define ARGPARSE_CONVERT_HPP
 #include <cerrno>
@@ -37,20 +38,20 @@ namespace argparse
 		char *end = nullptr;
 		errno = 0;
 		rawcvt(dst, arg, &end, base);
-		//example uses this but docs don't explicitly say sets to arg.
-		if (end != arg && !(borderval(dst) && errno == ERANGE))
-		{
-			//ensure no trailing invalid data.
-			while (std::isspace(*end)) { ++end; }
-			return !*end;
-		}
-		return false;
+		if (
+			(dst && borderval(dst) && errno == ERANGE)
+			|| (!dst && end == arg))
+		{ return false; }
+		//ensure no trailing invalid data.
+		//only spaces allowed
+		while (std::isspace(*end)) { ++end; }
+		return !*end;
 	}
 #define SPECIALIZE(T, valcheck, prefix) \
 	template<> \
 	bool store<prefix T>(prefix T &dst, const char *arg, int base) \
 	{ \
-		prefix long v; \
+		prefix long long v; \
 		if (store(v, arg, base) && valcheck) \
 		{ \
 			dst = static_cast<prefix T>(v); \
