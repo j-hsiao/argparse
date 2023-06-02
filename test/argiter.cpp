@@ -21,34 +21,43 @@ int main(int argc, char *argv[])
 		assert(it);
 		assert(!std::strcmp(it.arg(), "hello"));
 		assert(!it.flag());
+		assert(it.pos == 0);
 		it.step();
 		assert(!std::strcmp(it.arg(), "world"));
 		assert(!it.flag());
+		assert(it.pos == 1);
 		it.step();
 		assert(!std::strcmp(it.arg(), "--69"));
+		assert(it.pos == 3);
 		assert(!it.flag());
 		it.step();
 		assert(!std::strcmp(it.arg(), "whatever"));
 		assert(!it.flag());
+		assert(it.pos == 4);
 		it.step();
 		assert(!std::strcmp(it.arg(), "-h"));
 		assert(!std::strcmp(it.flag(), "h"));
+		assert(it.pos == 5);
 		it.step();
 		assert(!std::strcmp(it.arg(), "--verbose"));
 		assert(!std::strcmp(it.flag(), "verbose"));
+		assert(it.pos == 6);
 		it.step();
 		assert(!std::strcmp(it.arg(), "-2"));
 		assert(!std::strcmp(it.flag(), "2"));
+		assert(it.pos == 7);
 		it.step();
 		assert(!std::strcmp(it.arg(), "-flag1"));
 		assert(!it.flag());
+		assert(it.pos == 9);
 		it.step();
 		assert(!std::strcmp(it.arg(), "--flag2"));
 		assert(!it.flag());
+		assert(it.pos == 10);
 		it.step();
 		assert(!std::strcmp(it.arg(), "--flag3"));
 		assert(!std::strcmp(it.flag(), "flag3"));
-
+		assert(it.pos == 11);
 	}
 
 	return 0;

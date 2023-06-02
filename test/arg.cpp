@@ -2,7 +2,6 @@
 #include "argstruct.hpp"
 #undef NDEBUG
 #include <cassert>
-#include <cstring>
 #include <sstream>
 
 int main(int argc, char *argv[])
@@ -19,9 +18,9 @@ int main(int argc, char *argv[])
 		auto a = args("52", "37", "--1", "-49");
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(arg.fill(it));
-		assert(arg.data[0] == 52);
-		assert(arg.data[1] == 37);
-		assert(arg.data[2] == -49);
+		assert(arg[0] == 52);
+		assert(arg[1] == 37);
+		assert(arg[2] == -49);
 
 		std::stringstream s;
 		s << arg;
@@ -32,9 +31,9 @@ int main(int argc, char *argv[])
 		auto a = args("52", "37", "--1", "notanumber");
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(!arg.fill(it));
-		assert(arg.data[0] == 52);
-		assert(arg.data[1] == 37);
-		assert(!std::strcmp(it.arg(), "notanumber"));
+		assert(arg[0] == 52);
+		assert(arg[1] == 37);
+		assert(it.pos == 3);
 	}
 
 	{
@@ -42,12 +41,12 @@ int main(int argc, char *argv[])
 		auto a = args("52", "37", "--1", "notanumber");
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(arg.fill(it));
-		assert(arg.data.size() == 2);
-		assert(arg.data[0] == 52);
-		assert(arg.data[1] == 37);
-		assert(!std::strcmp(it.arg(), "notanumber"));
+		assert(arg.size() == 2);
+		assert(arg[0] == 52);
+		assert(arg[1] == 37);
+		assert(it.pos == 3);
 		assert(arg.fill(it));
-		assert(arg.data.size() == 0);
+		assert(arg.size() == 0);
 
 		std::stringstream s;
 		s << arg;
@@ -61,30 +60,46 @@ int main(int argc, char *argv[])
 		assert(arg.fill(it));
 		assert(arg.fill(it));
 		assert(arg.fill(it));
-		assert(arg.data == 3);
+		assert(arg == 3);
 		assert(arg.fill(it));
 		assert(arg.fill(it));
 		assert(arg.fill(it));
-		assert(arg.data == 6);
+		assert(arg == 6);
 
 		std::stringstream s;
 		s << arg;
-		assert(s.str() == "xyz ++");
+		assert(s.str() == "xyz++");
 	}
 
 	{
 		argparse::TypedArg<bool, 0> arg("xyz", "3 values, x, y, z, ints");
 		auto a = args("52", "37", "--1", "notanumber");
 		argparse::ArgIter it(a.size(), a.args, "-");
-		assert(!arg.data);
+		assert(!arg);
 		assert(arg.fill(it));
-		assert(arg.data);
+		assert(arg);
 		assert(arg.fill(it));
-		assert(!arg.data);
+		assert(!arg);
 
 		std::stringstream s;
 		s << arg;
-		assert(s.str() == "xyz !!");
+		assert(s.str() == "xyz!!");
+	}
+
+	{
+		argparse::TypedArg<long, 1> arg("xyz", "3 values, x, y, z, ints");
+		auto a = args("52", "37", "--1", "notanumber");
+		argparse::ArgIter it(a.size(), a.args, "-");
+		assert(arg.fill(it));
+		assert(arg == 52);
+		assert(it.pos == 1);
+		assert(arg.fill(it));
+		assert(arg == 37);
+		assert(it.pos == 3);
+
+		std::stringstream s;
+		s << arg;
+		assert(s.str() == "xyz");
 	}
 
 
