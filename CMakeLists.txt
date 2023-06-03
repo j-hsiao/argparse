@@ -40,11 +40,12 @@ add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
 include(CTest)
 if (BUILD_TESTING)
-	add_executable(demo test/test.cpp)
+	add_executable(demo EXCLUDE_FROM_ALL test/test.cpp)
 	target_link_libraries(demo PUBLIC ${PROJECT_NAME})
 
 	add_executable(nums test/nums.cpp)
 	target_link_libraries(nums PUBLIC ${PROJECT_NAME})
+	add_test(NAME nums COMMAND nums)
 
 	add_executable(arg test/arg.cpp)
 	target_link_libraries(arg PUBLIC ${PROJECT_NAME})
@@ -55,4 +56,8 @@ if (BUILD_TESTING)
 	target_link_libraries(argiter PUBLIC ${PROJECT_NAME})
 	add_test(NAME argiter COMMAND argiter)
 	target_include_directories(argiter PRIVATE test/include)
+
+	add_executable(${PROJECT_NAME}_test test/argparse.cpp)
+	target_link_libraries(argparse_test PUBLIC ${PROJECT_NAME})
+	add_test(NAME argparse COMMAND argparse_test)
 endif()

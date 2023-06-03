@@ -32,6 +32,17 @@ namespace argparse
 	void rawcvt(unsigned long long &dst, const char *args, char **end, int base)
 	{ dst = std::strtoull(args, end, base); }
 
+	template<class T, int numbase>
+	struct Base
+	{
+		static const int base = numbase;
+		T data;
+		operator T&() { return data; }
+		operator const T&() const { return data; }
+		Base operator=(const T &v) { data = v; return *this; }
+		bool operator==(T other) { return data = other; }
+	};
+
 	template<class T>
 	bool store(T &dst, const char *arg, int base=10)
 	{
@@ -47,6 +58,11 @@ namespace argparse
 		while (std::isspace(*end)) { ++end; }
 		return !*end;
 	}
+
+	template<class T, int base>
+	bool store(Base<T, base> &dst, const char *arg)
+	{ return store(dst.data, arg, base); }
+
 #define SPECIALIZE(T, valcheck, prefix) \
 	template<> \
 	bool store<prefix T>(prefix T &dst, const char *arg, int base) \

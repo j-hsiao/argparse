@@ -26,18 +26,26 @@
 
 namespace argparse
 {
+	template<>
+	bool store<const char*>(const char * &dst, const char *arg, int base)
+	{
+		dst = arg;
+		return true;
+	}
+
+	//The vec arg allows the Arg to be added to a list
+	//without the user having to explicitly add it.
+	//Simplifies user interface.
 	struct Arg
 	{
 		std::vector<Arg*> *vec;
 		const char *name;
 		const char *help;
-		bool parsed;
+		bool required;
 
-		Arg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr, bool parsed=false):
-			vec(vec), name(name), help(help), parsed(parsed)
-		{
-			if (vec) { vec->push_back(this); }
-		}
+		Arg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr, bool required=false):
+			vec(vec), name(name), help(help), required(required)
+		{ if (vec) { vec->push_back(this); } }
 		virtual bool fill(ArgIter &it) = 0;
 
 		virtual void argspec(std::ostream &o) const = 0;
@@ -47,14 +55,12 @@ namespace argparse
 			vec(other.vec),
 			name(other.name),
 			help(other.help),
-			parsed(other.parsed)
+			required(other.required)
 		{
 			if (vec)
 			{
-				if (vec->back() == &other)
-				{ vec->back() = this; }
-				else
-				{ vec->push_back(this); }
+				if (vec->back() == &other) { vec->back() = this; }
+				else { vec->push_back(this); }
 			}
 		}
 	};
@@ -66,10 +72,10 @@ namespace argparse
 		return o;
 	}
 
+	//Call set() count times on successive items while it returns true.
 	template<class TypedArg>
 	int fill(TypedArg &inst, int count, ArgIter &it)
 	{
-		inst.parsed = true;
 		for (int i=0; i<count; ++i)
 		{
 			if (!it || it.isflag || !inst.set(i, it.arg()))
@@ -79,6 +85,7 @@ namespace argparse
 		return count;
 	}
 
+	//Print all items in a container as a list.
 	template<class T>
 	void printvals(std::ostream &o, const T &data)
 	{
@@ -88,8 +95,9 @@ namespace argparse
 		o << ']';
 	}
 
+	//Difference between variable/fixed length multi-arg data.
 	template<class T, int count, bool=(count>=0)>
-	struct Datatype
+	struct MultiDataType
 	{
 		typedef std::array<T, count> type;
 		static void clear(type&){}
@@ -103,7 +111,7 @@ namespace argparse
 		}
 	};
 	template<class T, int count>
-	struct Datatype<T, count, false>
+	struct MultiDataType<T, count, false>
 	{
 		typedef std::vector<T> type;
 		static void clear(type& t){ t.clear(); }
@@ -124,21 +132,27 @@ namespace argparse
 	template <class T, int count=1>
 	struct TypedArg: public Arg
 	{
-		typedef Datatype<T, count> Typehelp;
+		typedef MultiDataType<T, count> Typehelp;
 		typename Typehelp::type data;
-		bool defaulted;
+		int ndefaults;
+
+		TypedArg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr):
+			Arg(name, help, vec, true),
+			data{},
+			ndefaults(0)
+		{}
 
 		TypedArg(
 			const char *name, const char *help,
-			std::initializer_list<T> defaults={}, std::vector<Arg*> *vec=nullptr
+			std::vector<Arg*> *vec, std::initializer_list<T> defaults
 		):
-			Arg(name, help, vec, count<0 || (defaults.size() == count)),
+			Arg(name, help, vec, false),
 			data{},
-			defaulted(defaults.size())
+			ndefaults(defaults.size())
 		{
-			if (defaults.size())
+			if (ndefaults)
 			{
-				if (count >= 0 && defaults.size() != count)
+				if (count >= 0 && ndefaults != count)
 				{
 					throw std::logic_error(
 						"The number of defaults should match the count for "
@@ -147,6 +161,11 @@ namespace argparse
 				Typehelp::fill(data, defaults);
 			}
 		}
+		TypedArg(TypedArg &&other):
+			Arg(std::move(static_cast<Arg&>(other))),
+			data(other.data),
+			ndefaults(other.ndefaults)
+		{}
 
 		decltype(data.size()) size() const { return data.size(); }
 		T& operator[](std::size_t idx) { return data[idx]; }
@@ -159,16 +178,15 @@ namespace argparse
 			else { o << " x" << count; }
 		}
 		void defaults(std::ostream &o) const override
-		{ if (parsed) { printvals(o, data); } }
+		{ if (ndefaults) { printvals(o, data); } }
 		bool set(int i, const char *arg)
 		{ return Typehelp::set(data, i, arg); }
 		bool fill(ArgIter &it) override
 		{
 			Typehelp::clear(data);
-			int numparsed = argparse::fill(
-				*this, count<0 ? it.argc : count, it
-			);
-			return count < 0 || numparsed == count;
+			int numparsed = argparse::fill(*this, count<0 ? it.argc : count, it);
+			if (count < 0) { return !required || numparsed > 0; }
+			else { return numparsed == count; }
 		}
 	};
 
@@ -180,27 +198,37 @@ namespace argparse
 	{
 		T data;
 		bool defaulted;
+		TypedArg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr):
+			Arg(name, help, vec, true),
+			data{},
+			defaulted(false)
+		{}
 
 		TypedArg(
 			const char *name, const char *help,
-			std::initializer_list<T> defaults={}, std::vector<Arg*> *vec=nullptr
+			std::vector<Arg*> *vec, std::initializer_list<T> defaults
 		):
-			Arg(name, help, vec, defaults.size() == 1),
+			Arg(name, help, vec, false),
 			data{},
-			defaulted(defaults.size())
+			defaulted(defaults.size() > 0)
 		{
-			if (defaults.size())
+			if (defaulted)
 			{
 				if (defaults.size() != 1)
 				{ throw std::logic_error("Only 1 default value should be given to single-typed arg."); }
 				data = *defaults.begin();
 			}
 		}
-		operator T() { return data; }
+		TypedArg(TypedArg &&other):
+			Arg(std::move(static_cast<Arg&>(other))),
+			data(other.data),
+			defaulted(other.defaulted)
+		{}
 
+		operator T() { return data; }
 		void argspec(std::ostream &o) const override {}
 		void defaults(std::ostream &o) const override
-		{ if (defaulted) { o << '(' << data << ')'; } }
+		{ if (defaulted) { o <<  data; } }
 
 		bool fill(ArgIter &it) override
 		{
@@ -217,20 +245,19 @@ namespace argparse
 	struct TypedArg<bool, 1>: public Arg
 	{
 		int data;
-		//ignore defaults.
-		//counting so if defaults then this is always true...
-		TypedArg(
-			const char *name, const char *help,
-			std::initializer_list<bool> defaults={}, std::vector<Arg*> *vec=nullptr
-		):
-			Arg(name, help, vec, true),
+		TypedArg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr):
+			Arg(name, help, vec, false),
 			data(0)
 		{}
+		TypedArg(TypedArg &&other):
+			Arg(std::move(static_cast<Arg&>(other))),
+			data(other.data)
+		{}
+
 		operator int() { return data; }
 		bool fill(ArgIter &it) override { ++data; return true; }
 		void argspec(std::ostream &o) const override { o << "++"; }
-		void defaults(std::ostream &o) const override
-		{ o << data; }
+		void defaults(std::ostream &o) const override {}
 	};
 
 	//------------------------------
@@ -240,18 +267,30 @@ namespace argparse
 	struct TypedArg<bool, 0>: public Arg
 	{
 		bool data;
-		//ignore defaults.
-		//counting so if defaults then this is always true...
+
+		TypedArg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr):
+			Arg(name, help, vec, false),
+			data(false)
+		{}
+
 		TypedArg(
 			const char *name, const char *help,
-			std::initializer_list<bool> defaults={}, std::vector<Arg*> *vec=nullptr
+			std::vector<Arg*> *vec, std::initializer_list<bool> defaults
 		):
-			Arg(name, help, vec, true),
-			data(0)
+			Arg(name, help, vec, false),
+			data(defaults.size() ? *defaults.begin() : false)
 		{
-			if (defaults.size())
-			{ data = *defaults.begin(); }
+			if (defaults.size() > 1)
+			{
+				throw std::logic_error(
+				"Bool flag " + std::string(name) + " should only have 1 initializer.");
+			}
 		}
+		TypedArg(TypedArg &&other):
+			Arg(std::move(static_cast<Arg&>(other))),
+			data(other.data)
+		{}
+
 		operator bool() { return data; }
 		bool fill(ArgIter &it) override { data = !data; return true; }
 		void argspec(std::ostream &o) const override { o << "!!"; }

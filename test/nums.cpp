@@ -18,5 +18,19 @@ int main(int argc, char *argv[])
 	assert(!argparse::store(val, "hi  "));
 	assert(!argparse::store(val, "  hi"));
 	assert(!argparse::store(val, "  69hi"));
+
+
+	{
+		argparse::Base<int, 16> val;
+		assert(argparse::store(val, "FF") && val.data == 255);
+		assert(val == 255);
+		assert(val == val);
+
+		assert(argparse::store(val, "F0") && val.data == 240);
+		assert(val == 240);
+		assert(val == val);
+	}
+
+
 	return 0;
 }
