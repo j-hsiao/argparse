@@ -1,7 +1,7 @@
 //Argument parsing helpers
 //
 // usage:
-//  Parser p(const char *help="", const char *prefix="-", int base=10);
+//  Parser p(const char *help="", const char *prefix="-");
 //  auto arg = p.add<type, count=1>(argname, helpstr, default_values={...});
 //  ...
 //  p.parse(int argc, const char *argv[]);
@@ -34,6 +34,12 @@
 //  count    data type   behavior
 //    1:     int         Should be a flag. Count the number of times it is given
 //    0:     bool        Should be a flag. Toggle the value of the flag.
+//
+// NOTE: to use different base for parsing arg, use
+// argparse::Base<type, base> as the type.
+// ex.
+//  p.add<argparse::Base<int, 16>, 3>(...) will create a fixed-length 3
+//  argument that parses arguments as hex numbers.
 //
 //  Omitting default values will make the arg required.  Giving default
 //  values makes the argument optional (even if empty).
@@ -90,6 +96,11 @@
 
 namespace argparse
 {
+	template<class T>
+	struct isbool { static const bool value = false; };
+	template<>
+	struct isbool<bool> { static const bool value = true; };
+
 	struct Parser
 	{
 		const char *help;
@@ -105,10 +116,44 @@ namespace argparse
 		{}
 
 		template<class T, int count>
-		TypedArg<T, count> add(const char *name, const char *help)
+		std::vector<Arg*>* check(const char *name)
 		{
-			return TypedArg<T, count>(name, help, name[0] == prefix[0] ? &flags : &pos);
-		};
+			bool isflag = name[0] == prefix[0];
+			if (isbool<T>::value && (count == 0 || count == 1) && isflag)
+			{
+				throw std::logic_error(
+					std::string(name) + " is <bool, [0|1]> but must be a flag.");
+			}
+			return isflag ? &flags : &pos;
+		}
+
+		template<class T, int count>
+		TypedArg<T, count> add(const char *name, const char *help)
+		{ return TypedArg<T, count>(name, help, check<T, count>(name)); }
+
+		template<class T, int count>
+		TypedArg<T, count> add(
+			const char *name, const char *help,
+			std::initializer_list<T> defaults)
+		{
+			return TypedArg<T, count>(
+				name, help, check<T, count>(name), defaults);
+		}
+
+		int parse(int argc, const char *argv[])
+		{ return parse(argc-1, argv+1, argv[0]); }
+
+		int parse(int argc, const char *argv[], const char *program)
+		{
+
+			return 0;
+		}
+
+		private:
+			bool handle_help()
+			{
+				return false;
+			}
 	};
 
 //	template<class T, class V>
