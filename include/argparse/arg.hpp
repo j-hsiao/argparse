@@ -26,21 +26,14 @@
 
 namespace argparse
 {
-	template<>
-	bool store<const char*>(const char * &dst, const char *arg, int base)
-	{
-		dst = arg;
-		return true;
-	}
-
-	struct Arg;
-	struct Flagfmt { const Arg* arg; };
-	struct Posfmt { const Arg* arg; };
 	//The vec arg allows the Arg to be added to a list
 	//without the user having to explicitly add it.
 	//Simplifies user interface.
 	struct Arg
 	{
+		struct Flagfmt { const Arg* arg; };
+		struct Posfmt { const Arg* arg; };
+
 		std::vector<Arg*> *vec;
 		const char *name;
 		const char *help;
@@ -72,15 +65,22 @@ namespace argparse
 		}
 	};
 
-	std::ostream& operator<<(std::ostream &o, const Flagfmt &f)
+	std::ostream& operator<<(std::ostream &o, const Arg::Flagfmt &f)
 	{
 		f.arg->flagspec(o);
 		return o;
 	}
-	std::ostream& operator<<(std::ostream &o, const Posfmt &p)
+	std::ostream& operator<<(std::ostream &o, const Arg::Posfmt &p)
 	{
 		p.arg->posspec(o);
 		return o;
+	}
+
+	template<>
+	bool store<const char*>(const char * &dst, const char *arg, int base)
+	{
+		dst = arg;
+		return true;
 	}
 
 	//Call set() count times on successive items while it returns true.

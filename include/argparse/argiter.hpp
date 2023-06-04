@@ -21,7 +21,6 @@ namespace argparse
 		const char *prefix;
 		int forcepos;
 
-
 		ArgIter(int argc, const char *argv[], const char *prefix="-"):
 			isflag(0),
 			argc(argc),

@@ -24,29 +24,17 @@ namespace argparse
 		std::vector<Arg*> pos;
 		std::vector<Arg*> flags;
 
+		std::vector<const char*> parsednames;
+		decltype(pos.begin()) lastpos;
+
 		Parser(const char *help=nullptr, const char *prefix="-"):
 			help(help),
 			prefix(prefix),
 			pos(),
-			flags()
+			flags(),
+			parsednames(),
+			lastpos()
 		{}
-
-		//Ensure bool, 0|1 is flag
-		//return appropriate vector to store argument.
-		template<class T, int count>
-		std::vector<Arg*>* check(const char *name)
-		{
-			bool isflag = name[0] == prefix[0];
-			if (isbool<T>::value && (count == 0 || count == 1) && isflag)
-			{
-				throw std::logic_error(
-					std::string(name) + " is <bool, [0|1]> but must be a flag.");
-			}
-			return isflag ? &flags : &pos;
-		}
-
-		const char *flagstart(const char *name)
-		{ return name + std::strspn(name, prefix); }
 
 		//Add required argument
 		template<class T, int count=1>
@@ -66,6 +54,84 @@ namespace argparse
 				flagstart(name), help, check<T, count>(name), defaults);
 		}
 
+		//parse main() args
+		int parse(int argc, const char *argv[])
+		{ return parse(argc-1, argv+1, argv[0]); }
+
+		//Parse arguments only
+		int parse(int argc, const char *argv[], const char *program)
+		{
+			struct ArgIter it(argc, argv, prefix);
+			int level = findhelp(it);
+			if (level)
+			{
+				dohelp(program, level);
+				return 1;
+			}
+			lastpos = pos.begin();
+			while (it)
+			{
+				if (it.isflag)
+				{
+					int idx = findflag(it.flag(), &std::cerr);
+					if (idx < 0) { return 2; }
+					if (flags[idx]->fill(it))
+					{ parsednames.push_back(flags[idx]->name); }
+					else
+					{
+						std::cerr << "Failed to parse argument \"" << it.arg()
+							<< "\" for flag " << prefix << flags[idx]->name << std::endl;
+						return 2;
+					}
+				}
+				else
+				{
+					if (lastpos == pos.end())
+					{
+						std::cerr << "Unexpected positional argument \""
+							<< it.arg() << "\"." << std::endl;
+						return 2;
+					}
+					if (!(*lastpos)->fill(it))
+					{
+						std::cerr << "Error parsing argument " << (*lastpos)->name
+							<< '(' << it.arg() << ')' << std::endl;
+						return 2;
+					}
+					++lastpos;
+				}
+			}
+			auto poscheck = lastpos;
+			while (poscheck != pos.end())
+			{
+				if ((*poscheck)->required)
+				{
+					std::cerr << "Missing required positional argument "
+						<< (*poscheck)->name << std::endl;
+					return 2;
+				}
+			}
+			//TODO no unparsed required flags.
+			return 0;
+		}
+
+		//Ensure bool, 0|1 is flag
+		//return appropriate vector to store argument.
+		template<class T, int count>
+		std::vector<Arg*>* check(const char *name)
+		{
+			bool isflag = name[0] == prefix[0];
+			if (isbool<T>::value && (count == 0 || count == 1) && isflag)
+			{
+				throw std::logic_error(
+					std::string(name) + " is <bool, [0|1]> but must be a flag.");
+			}
+			return isflag ? &flags : &pos;
+		}
+
+		const char *flagstart(const char *name)
+		{ return name + std::strspn(name, prefix); }
+
 		//-1 exact match
 		//0: no match
 		//>0: prefix length
@@ -82,32 +148,50 @@ namespace argparse
 		//best: optional output for the best length
 		//  0 for no match
 		//  -1 for exact match
-		int findflag(const char *name, int *best=nullptr)
+		int findflag(const char *name, std::ostream *out=nullptr)
 		{
-			int bst = 0;
-			int chosen = -1;
-			bool ambiguous = false;
+			int pick = -1;
 			for (int i=0; i<flags.size(); ++i)
 			{
-				int cur = flagmatch(name, flags[i]->name);
-				if (cur > bst)
+				int length = flagmatch(name, flags[i]->name);
+				if (length < 0) { return i; }
+				else if (length)
 				{
-					ambiguous = false;
-					bst = cur;
-					chosen = i;
+					if (pick == -1) { pick = i; }
+					else
+					{
+						if (pick != -2)
+						{
+							if (out)
+							{
+								*out << "Ambiguous flag " << prefix << name << std::endl
+									<< "Candidates:" << std::endl
+									<< '\t' << prefix << flags[pick]->name << std::endl;
+							}
+							pick = -2;
+						}
+						if (out)
+						{ *out << '\t' << prefix << flags[i]->name << std::endl; }
+					}
 				}
-				else if (cur < 0)
-				{
-					if (best) { *best = cur; }
-					return i;
-				}
-				else if (cur == bst)
-				{ ambiguous = true; }
 			}
-			if (best) { *best = bst; }
-			return ambiguous ? -2 : chosen;
+			if (pick == -1)
+			{
+				if (out)
+				{
+					*out << "Unrecognized flag \""
+						<< prefix << name << '"' << std::endl;
+				}
+			}
+			return pick;
 		}
 
+		//print help message
+		//level:
+		//  0: no help message
+		//  1: short
+		//  2: long
+		//
 		void dohelp(const char *program, int level)
 		{
 			if (level < 1) { return; }
@@ -152,9 +236,10 @@ namespace argparse
 			}
 		}
 
-		//0 no help
-		//1 short help
-		//2 long help
+		//return:
+		//  0 no help
+		//  1 short help
+		//  2 long help
 		int findhelp(ArgIter it)
 		{
 			while (it)
@@ -165,9 +250,7 @@ namespace argparse
 					if (hmatch)
 					{
 						if (it.isflag == 2) { return (hmatch == -1) + 1; }
-						int bestlen;
-						int picked = findflag(it.flag(), &bestlen);
-						if (!bestlen)
+						if (findflag(it.flag()) == -1)
 						{ return (hmatch == -1) + 1; }
 					}
 				}
@@ -175,23 +258,6 @@ namespace argparse
 			}
 			return 0;
 		}
-
-		//parse main() args
-		int parse(int argc, const char *argv[])
-		{ return parse(argc-1, argv+1, argv[0]); }
-
-		//Parse arguments only
-		int parse(int argc, const char *argv[], const char *program)
-		{
-
-			return 0;
-		}
-
-		private:
-			bool handle_help()
-			{
-				return false;
-			}
 	};
 
 //	template<class T, class V>
