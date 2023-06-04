@@ -70,14 +70,14 @@ namespace argparse
 		}
 
 		//name of flag without prefix chars
-		const char* flag()
+		const char* flag() const
 		{
 			if (isflag) { return argv[pos] + isflag; }
 			else { return nullptr; }
 		}
 
 		//current argument
-		const char* arg() { return argv[pos]; }
+		const char* arg() const { return argv[pos]; }
 
 
 

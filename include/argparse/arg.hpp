@@ -33,6 +33,9 @@ namespace argparse
 		return true;
 	}
 
+	struct Arg;
+	struct Flagfmt { const Arg* arg; };
+	struct Posfmt { const Arg* arg; };
 	//The vec arg allows the Arg to be added to a list
 	//without the user having to explicitly add it.
 	//Simplifies user interface.
@@ -48,7 +51,11 @@ namespace argparse
 		{ if (vec) { vec->push_back(this); } }
 		virtual bool fill(ArgIter &it) = 0;
 
-		virtual void argspec(std::ostream &o) const = 0;
+		Flagfmt flag() const { return {this}; }
+		Posfmt pos() const { return {this}; }
+
+		virtual void flagspec(std::ostream &o) const = 0;
+		virtual void posspec(std::ostream &o) const { flagspec(o); }
 		virtual void defaults(std::ostream &o) const = 0;
 
 		Arg(Arg &&other):
@@ -65,10 +72,14 @@ namespace argparse
 		}
 	};
 
-	std::ostream& operator<<(std::ostream &o, const Arg &arg)
+	std::ostream& operator<<(std::ostream &o, const Flagfmt &f)
 	{
-		o << arg.name;
-		arg.argspec(o);
+		f.arg->flagspec(o);
+		return o;
+	}
+	std::ostream& operator<<(std::ostream &o, const Posfmt &p)
+	{
+		p.arg->posspec(o);
 		return o;
 	}
 
@@ -172,8 +183,9 @@ namespace argparse
 		decltype(data.begin()) begin() { return data.begin(); }
 		decltype(data.end()) end() { return data.end(); }
 
-		void argspec(std::ostream &o) const override
+		void flagspec(std::ostream &o) const override
 		{
+			o << name;
 			if (count < 0) { o << " ..."; }
 			else { o << " x" << count; }
 		}
@@ -226,7 +238,10 @@ namespace argparse
 		{}
 
 		operator T() { return data; }
-		void argspec(std::ostream &o) const override {}
+		virtual void flagspec(std::ostream &o) const
+		{ o << name << ' ' << name; }
+		virtual void posspec(std::ostream &o) const
+		{ o << name; }
 		void defaults(std::ostream &o) const override
 		{ if (defaulted) { o <<  data; } }
 
@@ -256,7 +271,7 @@ namespace argparse
 
 		operator int() { return data; }
 		bool fill(ArgIter &it) override { ++data; return true; }
-		void argspec(std::ostream &o) const override { o << "++"; }
+		void flagspec(std::ostream &o) const override { o << name << "++"; }
 		void defaults(std::ostream &o) const override {}
 	};
 
@@ -293,7 +308,7 @@ namespace argparse
 
 		operator bool() { return data; }
 		bool fill(ArgIter &it) override { data = !data; return true; }
-		void argspec(std::ostream &o) const override { o << "!!"; }
+		void flagspec(std::ostream &o) const override { o << name << "!!"; }
 		void defaults(std::ostream &o) const override
 		{ o << data; }
 	};

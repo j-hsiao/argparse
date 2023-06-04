@@ -86,6 +86,7 @@
 #ifndef ARGPARSE_HPP
 #define ARGPARSE_HPP
 #include "argparse/arg.hpp"
+#include "argparse/argiter.hpp"
 
 #include <array>
 #include <cstring>
@@ -115,6 +116,8 @@ namespace argparse
 			flags()
 		{}
 
+		//Ensure bool, 0|1 is flag
+		//return appropriate vector to store argument.
 		template<class T, int count>
 		std::vector<Arg*>* check(const char *name)
 		{
@@ -127,22 +130,114 @@ namespace argparse
 			return isflag ? &flags : &pos;
 		}
 
-		template<class T, int count>
-		TypedArg<T, count> add(const char *name, const char *help)
-		{ return TypedArg<T, count>(name, help, check<T, count>(name)); }
+		const char *flagstart(const char *name)
+		{ return name + std::strspn(name, prefix); }
 
-		template<class T, int count>
+		//Add required argument
+		template<class T, int count=1>
+		TypedArg<T, count> add(const char *name, const char *help)
+		{
+			return TypedArg<T, count>(
+				flagstart(name), help, check<T, count>(name));
+		}
+
+		//add optional requirement
+		template<class T, int count=1>
 		TypedArg<T, count> add(
 			const char *name, const char *help,
 			std::initializer_list<T> defaults)
 		{
 			return TypedArg<T, count>(
-				name, help, check<T, count>(name), defaults);
+				flagstart(name), help, check<T, count>(name), defaults);
 		}
 
+		//-1 exact match
+		//0: no match
+		//>0: prefix length
+		int flagmatch(const char *arg, const char *flag)
+		{
+			int i = 0;
+			while (arg[i] && arg[i] == flag[i]) { ++i; }
+			if (arg[i]) { return 0; }
+			else if (!flag[i]) { return -1; }
+			{ return i; }
+		}
+
+		//Find index of best flag.  -1 if no match. -2 if ambiguous
+		//best: optional output for the best length
+		//  0 for no match
+		//  -1 for exact match
+		int findflag(const char *name, int *best=nullptr)
+		{
+			int bst = 0;
+			int chosen = -1;
+			bool ambiguous = false;
+			for (int i=0; i<flags.size(); ++i)
+			{
+				int cur = flagmatch(name, flags[i]->name);
+				if (cur > bst)
+				{
+					ambiguous = false;
+					bst = cur;
+					chosen = i;
+				}
+				else if (cur < 0)
+				{
+					if (best) { *best = cur; }
+					return i;
+				}
+				else if (cur == bst)
+				{ ambiguous = true; }
+			}
+			if (best) { *best = bst; }
+			return ambiguous ? -2 : chosen;
+		}
+
+		void dohelp(const char *program)
+		{
+			const char *wraps[] = {"[]", "<>"};
+			std::cerr << "Usage: " << (program ? program : "program");
+			for (Arg *a : flags)
+			{
+				std::cerr << ' ' << wraps[a->required][0]
+					<< prefix << a->flag() << wraps[a->required][1];
+			}
+			for (Arg *a : pos)
+			{
+				std::cerr << ' ' << wraps[a->required][0]
+					<< a->pos() << wraps[a->required][1];
+			}
+		}
+
+		//0 no help
+		//1 short help
+		//2 long help
+		int findhelp(ArgIter it)
+		{
+			while (it)
+			{
+				if (it.isflag)
+				{
+					int hmatch = flagmatch(it.flag(), "help");
+					if (hmatch)
+					{
+						if (it.isflag == 2) { return (hmatch == -1) + 1; }
+						int bestlen;
+						int picked = findflag(it.flag(), &bestlen);
+						if (!bestlen)
+						{ return (hmatch == -1) + 1; }
+					}
+				}
+				it.step();
+			}
+			return 0;
+		}
+
+		//parse main() args
 		int parse(int argc, const char *argv[])
 		{ return parse(argc-1, argv+1, argv[0]); }
 
+		//Parse arguments only
 		int parse(int argc, const char *argv[], const char *program)
 		{
 

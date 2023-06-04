@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 		assert(arg[1] == 37);
 		assert(arg[2] == -49);
 		std::stringstream s;
-		s << arg;
+		s << arg.pos();
 		assert(s.str() == "xyz x3");
 	}
 	{
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 		assert(arg.size() == 0);
 
 		std::stringstream s;
-		s << arg;
+		s << arg.pos();
 		assert(s.str() == "xyz ...");
 	}
 
@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 		assert(arg == 6);
 
 		std::stringstream s;
-		s << arg;
+		s << arg.flag();
 		assert(s.str() == "xyz++");
 	}
 
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
 		assert(!arg);
 
 		std::stringstream s;
-		s << arg;
+		s << arg.flag();
 		assert(s.str() == "xyz!!");
 	}
 
@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 		assert(it.pos == 3);
 
 		std::stringstream s;
-		s << arg;
+		s << arg.pos();
 		assert(s.str() == "xyz");
 	}
 

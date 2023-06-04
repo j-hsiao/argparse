@@ -12,7 +12,7 @@ arguments will be treated as positional arguments.  These can be useful
 for giving negative numbers as arguments, though an alternative is to
 prefix it with an escaped space.
 
-Flag arguments are first matched exactly.  If there are no exact
+Flag arguments match the first exact match.  If there are no exact
 matches, then the longest unique prefix match is used.  If the longest
 match is not unique, then parsing is failed due to ambiguity.
 
