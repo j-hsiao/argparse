@@ -100,7 +100,7 @@ namespace argparse
 	template<class T>
 	void printvals(std::ostream &o, const T &data)
 	{
-		o << '[' << data[0];
+		o << ": [" << data[0];
 		for (int i=0; i<data.size(); ++i)
 		{ o << ", " << data[i]; }
 		o << ']';
@@ -190,7 +190,14 @@ namespace argparse
 			else { o << " x" << count; }
 		}
 		void defaults(std::ostream &o) const override
-		{ if (ndefaults) { printvals(o, data); } }
+		{
+			if (ndefaults)
+			{
+				o << "(default: ";
+				printvals(o, data);
+				o << ')';
+			}
+		}
 		bool set(int i, const char *arg)
 		{ return Typehelp::set(data, i, arg); }
 		bool fill(ArgIter &it) override
@@ -243,7 +250,7 @@ namespace argparse
 		virtual void posspec(std::ostream &o) const
 		{ o << name; }
 		void defaults(std::ostream &o) const override
-		{ if (defaulted) { o <<  data; } }
+		{ if (defaulted) { o << "(default: " << data << ')'; } }
 
 		bool fill(ArgIter &it) override
 		{
@@ -310,7 +317,7 @@ namespace argparse
 		bool fill(ArgIter &it) override { data = !data; return true; }
 		void flagspec(std::ostream &o) const override { o << name << "!!"; }
 		void defaults(std::ostream &o) const override
-		{ o << data; }
+		{ o << "(default: " << (data ? "true" : "false") << ')'; }
 	};
 
 

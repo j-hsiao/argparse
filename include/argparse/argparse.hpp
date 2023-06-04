@@ -1,88 +1,3 @@
-//Argument parsing helpers
-//
-// usage:
-//  Parser p(const char *help="", const char *prefix="-");
-//  auto arg = p.add<type, count=1>(argname, helpstr, default_values={...});
-//  ...
-//  p.parse(int argc, const char *argv[]);
-//  p.parse(int argc, const char *argv[], const char *program);
-//    If program is given then argc, argv are assumed to not contain
-//    the program name.  Otherwise, argc and argv are assumed to be as
-//    given to main(), argv[0] is the name of the program and arguments
-//    start at argv[1].
-//    return values:
-//      0: success
-//      1: help message
-//      2: parse error
-//    The help flag is searched for first.  If found, then no default
-//    values will be changed.
-//
-// NOTE: Pointers are taken as-is so their lifetime should be at least
-// as long as the lifetime of the corresponding args/parser.
-//
-// The prefix char string should contain 1 character.
-// The parsed arguments are directly available as arg.data.
-// The returned structs also have methods to access the data member.
-//
-// The interface of the returned struct depends on count.
-//   count    data type                 interface
-//     >1:    std::array<type, count>   begin(), end(), operator[](), size()
-//     <0:    std::vector<type>         begin(), end(), operator[](), size()
-//     1 :    type                      operator type()
-//
-// Exceptions exist for bool types:
-//  count    data type   behavior
-//    1:     int         Should be a flag. Count the number of times it is given
-//    0:     bool        Should be a flag. Toggle the value of the flag.
-//
-// NOTE: to use different base for parsing arg, use
-// argparse::Base<type, base> as the type.
-// ex.
-//  p.add<argparse::Base<int, 16>, 3>(...) will create a fixed-length 3
-//  argument that parses arguments as hex numbers.
-//
-//  Omitting default values will make the arg required.  Giving default
-//  values makes the argument optional (even if empty).
-//
-//  An argument is a flag if it begins with the char in prefix.  The
-//  number of prefix chars does not matter and will all be removed to
-//  parse the flag name.  Otherwise, it is a positional argument.
-//  Flags will be arguments given by first specifying the flag and then
-//  any values afterwards.  Positional arguments are parsed by their
-//  position in the argument list.  Multi arg sequences will be
-//  interrupted by flags.  Flag matching follows these rules:
-//    1. First exact match, in the order the flags were created.
-//    2. If no exact matches are found, then the longest match if
-//       unique.  If not unique, then the flag is considered ambiguous
-//       and parsing will fail.
-//
-//    NOTE: it is the user's responsibility to ensure no flags have
-//    identical names.
-//
-//  Special flags:
-//    --[N]   N: an integer (optional).  The next N arguments will be
-//            treated as a positional argument.  If N is omitted, then
-//            N will be all remaining arguments.
-//    -help   Print help message and stop parsing.  If the flag starts
-//            with 2 prefix chars then even if ambiguous, the flag will
-//            match with help.  If the flag has the full "help", then
-//            the full help message will be given.  Otherwise, a short
-//            help message will be given.
-//            ex.
-//              Parser arguments: "-hello", "-helper"
-//              Command line flag:  Match result
-//                -hel              Failure, ambiguous (-hello or -helper)
-//                --hel[p]          -help (hel is ambiguous, but 2
-//                                  prefix chars so prefers help)
-//                -help             -helper
-//
-// help notation:
-//   xN: fixed N arguments
-//   ...: required multi argument
-//   [...]: optional multi argument
-//   ++: counting boolean flag
-//   !!: toggling boolean flag
-// later flags will overwrite newer flags.
 #ifndef ARGPARSE_HPP
 #define ARGPARSE_HPP
 #include "argparse/arg.hpp"
@@ -109,7 +24,7 @@ namespace argparse
 		std::vector<Arg*> pos;
 		std::vector<Arg*> flags;
 
-		Parser(const char *help="", const char *prefix="-"):
+		Parser(const char *help=nullptr, const char *prefix="-"):
 			help(help),
 			prefix(prefix),
 			pos(),
@@ -193,8 +108,9 @@ namespace argparse
 			return ambiguous ? -2 : chosen;
 		}
 
-		void dohelp(const char *program)
+		void dohelp(const char *program, int level)
 		{
+			if (level < 1) { return; }
 			const char *wraps[] = {"[]", "<>"};
 			std::cerr << "Usage: " << (program ? program : "program");
 			for (Arg *a : flags)
@@ -206,6 +122,33 @@ namespace argparse
 			{
 				std::cerr << ' ' << wraps[a->required][0]
 					<< a->pos() << wraps[a->required][1];
+			}
+			std::cerr << std::endl;
+			if (level < 2) { return; }
+			if (help) { std::cerr << std::endl << help << std::endl; }
+			if (flags.size())
+			{
+				std::cerr << std::endl << "Flags:" << std::endl;
+				for (Arg *a : flags)
+				{
+					std::cerr << wraps[a->required][0] << prefix << a->flag()
+						<< wraps[a->required][1];
+					a->defaults(std::cerr);
+					std::cerr << std::endl;
+					if (a->help && a->help[0]) { std::cerr << '\t' <<  a->help << std::endl; }
+				}
+			}
+			if (pos.size())
+			{
+				std::cerr << std::endl << "Positionals:" << std::endl;
+				for (Arg *a : pos)
+				{
+					std::cerr << wraps[a->required][0] << prefix << a->pos()
+						<< wraps[a->required][1];
+					a->defaults(std::cerr);
+					std::cerr << std::endl;
+					if (a->help && a->help[0]) { std::cerr << '\t' <<  a->help << std::endl; }
+				}
 			}
 		}
 

@@ -28,6 +28,8 @@ int main(int argc, char *argv[])
 		argparse::Parser p;
 		auto hen = p.add<const char*>("-hen", "name of a hen", {"Henrietta"});
 		auto hez = p.add<const char*>("-hez", "some flag");
+		auto pos2 = p.add<const char*>("pos2", "some required positional argument");
+		auto pos1 = p.add<const char*>("pos1", "some optional positional argument", {"some default"});
 		{
 			auto args = ::args("arg1", "whatever", "-someflag", "--someflag", "-he");
 			argparse::ArgIter it(args.size(), args.args);
@@ -54,7 +56,8 @@ int main(int argc, char *argv[])
 			assert(p.findhelp(it) == 2);
 		}
 
-		p.dohelp("programname");
+		p.dohelp("programname", 1);
+		p.dohelp("programname", 2);
 	}
 
 
