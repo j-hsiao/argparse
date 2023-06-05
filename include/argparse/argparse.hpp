@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace argparse
@@ -19,21 +20,57 @@ namespace argparse
 
 	struct Parser
 	{
+		struct Alias
+		{
+			const char *name;
+			int idx;
+		};
 		const char *help;
 		const char *prefix;
 		std::vector<Arg*> pos;
 		std::vector<Arg*> flags;
+		std::vector<Alias> aliases;
+		std::ostream &ostream;
 
-		std::vector<const char*> parsednames;
-		decltype(pos.begin()) lastpos;
+		struct ParseResult
+		{
+			Parser *p;
+			std::vector<const char*> parsednames;
+			decltype(p->pos.begin()) lastpos;
+			int code;
 
-		Parser(const char *help=nullptr, const char *prefix="-"):
+			operator bool () const { return code == 0; }
+
+			bool parsed(const char *name) const
+			{
+				if (name[0] == p->prefix[0])
+				{
+					name += std::strspn(name, p->prefix);
+					for (const char *flagname : parsednames)
+					{
+						if (std::strcmp(name, flagname) == 0)
+						{ return true; }
+					}
+					return false;
+				}
+				else
+				{
+					for (auto it = lastpos; it != p->pos.end(); ++it)
+					{
+						if (std::strcmp(name, (*it)->name) == 0)
+						{ return false; }
+					}
+					return true;
+				}
+			}
+		};
+
+		Parser(const char *help=nullptr, const char *prefix="-", std::ostream &out=std::cerr):
 			help(help),
 			prefix(prefix),
 			pos(),
 			flags(),
-			parsednames(),
-			lastpos()
+			ostream(out)
 		{}
 
 		//Add required argument
@@ -54,65 +91,87 @@ namespace argparse
 				flagstart(name), help, check<T, count>(name), defaults);
 		}
 
+		template<class T, int count=1>
+		TypedArg<T, count> add(
+			std::initializer_list<const char*> names, const char *help)
+		{
+			add_aliases(names);
+			const char *name = *names.begin();
+			return TypedArg<T, count>(
+				flagstart(name), help, check<T, count>(name));
+		}
+
+		template<class T, int count=1>
+		TypedArg<T, count> add(
+			std::initializer_list<const char*> names, const char *help,
+			std::initializer_list<T> defaults)
+		{
+			add_aliases(names);
+			const char *name = *names.begin();
+			return TypedArg<T, count>(
+				flagstart(name), help, check<T, count>(name), defaults);
+		}
+
+
 		//parse main() args
-		int parse(int argc, const char *argv[])
+		ParseResult parse(int argc, const char * const argv[])
 		{ return parse(argc-1, argv+1, argv[0]); }
 
 		//Parse arguments only
-		int parse(int argc, const char *argv[], const char *program)
+		ParseResult parse(int argc, const char * const argv[], const char *program)
 		{
+			ParseResult ret{this, {}, pos.begin(), 0};
 			struct ArgIter it(argc, argv, prefix);
 			int level = findhelp(it);
 			if (level)
 			{
 				dohelp(program, level);
-				return 1;
+				ret.code = 1;
+				return ret;
 			}
-			lastpos = pos.begin();
 			while (it)
 			{
 				if (it.isflag)
-				{
-					int idx = findflag(it.flag(), &std::cerr);
-					if (idx < 0) { return 2; }
-					if (flags[idx]->fill(it))
-					{ parsednames.push_back(flags[idx]->name); }
-					else
-					{
-						std::cerr << "Failed to parse argument \"" << it.arg()
-							<< "\" for flag " << prefix << flags[idx]->name << std::endl;
-						return 2;
-					}
-				}
+				{ parse_flag(it, ret); }
 				else
-				{
-					if (lastpos == pos.end())
-					{
-						std::cerr << "Unexpected positional argument \""
-							<< it.arg() << "\"." << std::endl;
-						return 2;
-					}
-					if (!(*lastpos)->fill(it))
-					{
-						std::cerr << "Error parsing argument " << (*lastpos)->name
-							<< '(' << it.arg() << ')' << std::endl;
-						return 2;
-					}
-					++lastpos;
-				}
+				{ parse_pos(it, ret); }
+				if (ret.code) { return ret; }
 			}
-			auto poscheck = lastpos;
+			auto poscheck = ret.lastpos;
 			while (poscheck != pos.end())
 			{
 				if ((*poscheck)->required)
 				{
-					std::cerr << "Missing required positional argument "
+					ostream << "Missing required positional argument "
 						<< (*poscheck)->name << std::endl;
-					return 2;
+					ret.code = 2;
+					return ret;
+				}
+				++poscheck;
+			}
+			for (Arg *flag : flags)
+			{
+				if (flag->required)
+				{
+					bool wasparsed = false;
+					for (const char *name : ret.parsednames)
+					{
+						if (name == flag->name)
+						{
+							wasparsed = true;
+							break;
+						}
+					}
+					if (!wasparsed)
+					{
+						ostream << "Missing required flag "
+							<< prefix << flag->name << std::endl;
+						ret.code = 2;
+						return ret;
+					}
 				}
 			}
-			//TODO no unparsed required flags.
-			return 0;
+			return ret;
 		}
 
 		//Ensure bool, 0|1 is flag
@@ -121,7 +180,7 @@ namespace argparse
 		std::vector<Arg*>* check(const char *name)
 		{
 			bool isflag = name[0] == prefix[0];
-			if (isbool<T>::value && (count == 0 || count == 1) && isflag)
+			if (isbool<T>::value && (count == 0 || count == 1) && !isflag)
 			{
 				throw std::logic_error(
 					std::string(name) + " is <bool, [0|1]> but must be a flag.");
@@ -145,11 +204,9 @@ namespace argparse
 		}
 
 		//Find index of best flag.  -1 if no match. -2 if ambiguous
-		//best: optional output for the best length
-		//  0 for no match
-		//  -1 for exact match
 		int findflag(const char *name, std::ostream *out=nullptr)
 		{
+			std::vector<const char *> choices;
 			int pick = -1;
 			for (int i=0; i<flags.size(); ++i)
 			{
@@ -162,17 +219,23 @@ namespace argparse
 					{
 						if (pick != -2)
 						{
-							if (out)
-							{
-								*out << "Ambiguous flag " << prefix << name << std::endl
-									<< "Candidates:" << std::endl
-									<< '\t' << prefix << flags[pick]->name << std::endl;
-							}
+							choices.push_back(flags[pick]->name);
 							pick = -2;
 						}
-						if (out)
-						{ *out << '\t' << prefix << flags[i]->name << std::endl; }
+						choices.push_back(flags[i]->name);
 					}
+				}
+			}
+			std::vector<Alias*> achoices;
+			for (auto &alias : aliases)
+			{
+				int length = flagmatch(name, alias.name);
+				if (length < 0) { return alias.idx; }
+				else if (length)
+				{
+					achoices.push_back(&alias);
+					if (pick == -1) { pick = alias.idx; }
+					else { pick = -2; }
 				}
 			}
 			if (pick == -1)
@@ -181,6 +244,19 @@ namespace argparse
 				{
 					*out << "Unrecognized flag \""
 						<< prefix << name << '"' << std::endl;
+				}
+			}
+			else if (pick == -2 && out)
+			{
+				*out << "Ambiguous flag \""
+					<< prefix << name << '"' << std::endl
+					<< "Candidates:" << std::endl;
+				for (const char *nm : choices)
+				{ *out << '\t' << prefix << nm << std::endl; }
+				for (const Alias *a : achoices)
+				{
+					*out << '\t' << prefix << a->name << " -> "
+						<< prefix << flags[a->idx]->name << std::endl;
 				}
 			}
 			return pick;
@@ -196,42 +272,60 @@ namespace argparse
 		{
 			if (level < 1) { return; }
 			const char *wraps[] = {"[]", "<>"};
-			std::cerr << "Usage: " << (program ? program : "program");
+			ostream << "Usage: " << (program ? program : "program");
 			for (Arg *a : flags)
 			{
-				std::cerr << ' ' << wraps[a->required][0]
+				ostream << ' ' << wraps[a->required][0]
 					<< prefix << a->flag() << wraps[a->required][1];
 			}
 			for (Arg *a : pos)
 			{
-				std::cerr << ' ' << wraps[a->required][0]
+				ostream << ' ' << wraps[a->required][0]
 					<< a->pos() << wraps[a->required][1];
 			}
-			std::cerr << std::endl;
+			ostream << std::endl;
 			if (level < 2) { return; }
-			if (help) { std::cerr << std::endl << help << std::endl; }
+			if (help) { ostream << std::endl << help << std::endl; }
 			if (flags.size())
 			{
-				std::cerr << std::endl << "Flags:" << std::endl;
+				ostream << std::endl << "Flags:" << std::endl;
 				for (Arg *a : flags)
 				{
-					std::cerr << wraps[a->required][0] << prefix << a->flag()
+					ostream << wraps[a->required][0] << prefix << a->flag()
 						<< wraps[a->required][1];
-					a->defaults(std::cerr);
-					std::cerr << std::endl;
-					if (a->help && a->help[0]) { std::cerr << '\t' <<  a->help << std::endl; }
+					a->defaults(ostream);
+					ostream << std::endl;
+					auto it = aliases.begin();
+					while (it != aliases.end())
+					{
+						if (flags[it->idx] == a)
+						{
+							ostream << "\tAliases: " << prefix << it->name;
+							++it;
+							while (it != aliases.end() && flags[it->idx] == a)
+							{
+								ostream << ", " << prefix << it->name;
+								++it;
+							}
+							ostream << std::endl;
+							break;
+						}
+						else
+						{ ++it; }
+					}
+					if (a->help && a->help[0]) { ostream << '\t' <<  a->help << std::endl; }
 				}
 			}
 			if (pos.size())
 			{
-				std::cerr << std::endl << "Positionals:" << std::endl;
+				ostream << std::endl << "Positionals:" << std::endl;
 				for (Arg *a : pos)
 				{
-					std::cerr << wraps[a->required][0] << prefix << a->pos()
+					ostream << wraps[a->required][0] << a->pos()
 						<< wraps[a->required][1];
-					a->defaults(std::cerr);
-					std::cerr << std::endl;
-					if (a->help && a->help[0]) { std::cerr << '\t' <<  a->help << std::endl; }
+					a->defaults(ostream);
+					ostream << std::endl;
+					if (a->help && a->help[0]) { ostream << '\t' <<  a->help << std::endl; }
 				}
 			}
 		}
@@ -258,6 +352,84 @@ namespace argparse
 			}
 			return 0;
 		}
+
+		void parse_pos(ArgIter &it, ParseResult &ret)
+		{
+			if (ret.lastpos == pos.end())
+			{
+				ostream << "Unexpected positional argument \""
+					<< it.arg() << '"' << std::endl;
+				ret.code = 2;
+				return;
+			}
+			int code = (*ret.lastpos)->fill(it);
+			if (code)
+			{
+				if (code == 1)
+				{
+					ostream << "Mising arguments for positional "
+						<< (*ret.lastpos)->name << std::endl;
+				}
+				else if (code == 2)
+				{
+					ostream << "Error parsing argument for positional "
+						<< (*ret.lastpos)->name << ": \"" << it.arg() << '"' << std::endl;
+				}
+				ret.code = 2;
+				return;
+			}
+			++ret.lastpos;
+		}
+
+		void parse_flag(ArgIter &it, ParseResult &ret)
+		{
+			int idx = findflag(it.flag(), &ostream);
+			if (idx < 0)
+			{
+				ret.code = 2;
+				return;
+			}
+			it.step();
+			int code = flags[idx]->fill(it);
+			if (code)
+			{
+				if (code == 1)
+				{
+					ostream << "Missing arguments for flag " << prefix
+						<< flags[idx]->name << std::endl;
+				}
+				else if (code == 2)
+				{
+					ostream << "Failed to parse argument for flag "
+						<< prefix << flags[idx]->name << ": \"" << it.arg() << '"' << std::endl;
+				}
+				ret.code = 2;
+				return;
+			}
+			else
+			{ ret.parsednames.push_back(flags[idx]->name); }
+		}
+
+		void add_aliases(std::initializer_list<const char*> names)
+		{
+			if (!names.size())
+			{ throw std::logic_error("At least 1 name hould be given."); }
+			auto it = names.begin();
+			const char *name = *it;
+			if (name[0] != prefix[0])
+			{ throw std::logic_error("multi-name add requires flags."); }
+			++it;
+			while (it != names.end())
+			{
+				if ((*it)[0] != prefix[0])
+				{ throw std::logic_error("Aliases must be flags."); }
+				aliases.push_back(
+					{flagstart(*it), static_cast<int>(flags.size())});
+				++it;
+			}
+		}
+
+
 	};
 
 //	template<class T, class V>

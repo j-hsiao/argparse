@@ -17,11 +17,11 @@ namespace argparse
 		//> 0 if isflag else not a flag (doesn't start with prefix)
 		std::size_t isflag;
 		int argc, pos;
-		const char **argv;
+		const char * const *argv;
 		const char *prefix;
 		int forcepos;
 
-		ArgIter(int argc, const char *argv[], const char *prefix="-"):
+		ArgIter(int argc, const char * const argv[], const char *prefix="-"):
 			isflag(0),
 			argc(argc),
 			pos(-1),

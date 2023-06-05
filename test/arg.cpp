@@ -5,6 +5,27 @@
 #include <cstring>
 #include <sstream>
 
+struct Point { int x, y; };
+
+namespace argparse
+{
+	template<>
+	bool create(Point &dst, ArgIter &it)
+	{
+		if (!store(dst.x, it.arg())) { return false; }
+		it.step();
+		if (!it || it.isflag || !store(dst.y, it.arg()))
+		{ return false; }
+		it.step();
+		return true;
+	}
+}
+std::ostream& operator<<(std::ostream &o, const Point &p)
+{
+	o << '<' << p.x << ',' << p.y << '>';
+	return o;
+}
+
 int main(int argc, char *argv[])
 {
 	try
@@ -22,12 +43,15 @@ int main(int argc, char *argv[])
 		assert(arg[1] == 2);
 		assert(arg[2] == 3);
 		argparse::ArgIter it(a.size(), a.args, "-");
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(arg[0] == 52);
 		assert(arg[1] == 37);
 		assert(arg[2] == -49);
 		std::stringstream s;
 		s << arg.pos();
+		assert(s.str() == "xyz x3");
+		s.str("");
+		s << arg.flag();
 		assert(s.str() == "xyz x3");
 	}
 	{
@@ -35,7 +59,7 @@ int main(int argc, char *argv[])
 		auto a = args("52", "37", "--1", "notanumber");
 		assert(arg.required);
 		argparse::ArgIter it(a.size(), a.args, "-");
-		assert(!arg.fill(it));
+		assert(arg.fill(it) == 2);
 		assert(arg[0] == 52);
 		assert(arg[1] == 37);
 		assert(it.pos == 3);
@@ -46,16 +70,19 @@ int main(int argc, char *argv[])
 		auto a = args("52", "37", "--1", "notanumber");
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(!arg.required);
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(arg.size() == 2);
 		assert(arg[0] == 52);
 		assert(arg[1] == 37);
 		assert(it.pos == 3);
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(arg.size() == 0);
 
 		std::stringstream s;
 		s << arg.pos();
+		assert(s.str() == "xyz ...");
+		s.str("");
+		s << arg.flag();
 		assert(s.str() == "xyz ...");
 	}
 
@@ -63,13 +90,13 @@ int main(int argc, char *argv[])
 		argparse::TypedArg<bool> arg("xyz", "3 values, x, y, z, ints");
 		auto a = args("52", "37", "--1", "notanumber");
 		argparse::ArgIter it(a.size(), a.args, "-");
-		assert(arg.fill(it));
-		assert(arg.fill(it));
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
+		assert(arg.fill(it) == 0);
+		assert(arg.fill(it) == 0);
 		assert(arg == 3);
-		assert(arg.fill(it));
-		assert(arg.fill(it));
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
+		assert(arg.fill(it) == 0);
+		assert(arg.fill(it) == 0);
 		assert(arg == 6);
 
 		std::stringstream s;
@@ -82,9 +109,9 @@ int main(int argc, char *argv[])
 		auto a = args("52", "37", "--1", "notanumber");
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(!arg);
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(arg);
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(!arg);
 
 		std::stringstream s;
@@ -96,16 +123,19 @@ int main(int argc, char *argv[])
 		argparse::TypedArg<long, 1> arg("xyz", "3 values, x, y, z, ints");
 		auto a = args("52", "37", "--1", "notanumber");
 		argparse::ArgIter it(a.size(), a.args, "-");
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(arg == 52);
 		assert(it.pos == 1);
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(arg == 37);
 		assert(it.pos == 3);
 
 		std::stringstream s;
 		s << arg.pos();
 		assert(s.str() == "xyz");
+		s.str("");
+		s << arg.flag();
+		assert(s.str() == "xyz xyz");
 	}
 
 	{
@@ -118,7 +148,7 @@ int main(int argc, char *argv[])
 		assert(ptrs[0] == &arg);
 		assert(arg[0] == 1.0);
 		assert(arg[1] == 2.0);
-		ptrs[0]->fill(it);
+		assert(ptrs[0]->fill(it) == 0);
 		assert(it.pos == 3);
 		assert(arg[0] == 52.0);
 		assert(arg[1] == 37.0);
@@ -130,7 +160,7 @@ int main(int argc, char *argv[])
 		assert(!arg.required);
 		auto a = args("52", "37", "--1", "notanumber");
 		argparse::ArgIter it(a.size(), a.args, "-");
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(it.pos == it.argc);
 		assert(!std::strcmp(arg[0], "52"));
 		assert(!std::strcmp(arg[1], "37"));
@@ -143,11 +173,21 @@ int main(int argc, char *argv[])
 		assert(arg.required);
 		auto a = args("52", "37", "--1", "FAB");
 		argparse::ArgIter it(a.size(), a.args, "-");
-		assert(arg.fill(it));
+		assert(arg.fill(it) == 0);
 		assert(it.pos == it.argc);
 		assert(arg[0] == 82);
 		assert(arg[1] == 55);
 		assert(arg[2] == 4011);
+	}
+
+	{
+		argparse::TypedArg<Point, 1> arg("xy", "x, y coordinate");
+		assert(arg.required);
+		auto a = args("52", "37", "--1", "FAB");
+		argparse::ArgIter it(a.size(), a.args, "-");
+		assert(arg.fill(it) == 0);
+		assert(arg.data.x == 52);
+		assert(arg.data.y == 37);
 	}
 
 

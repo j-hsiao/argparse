@@ -40,7 +40,7 @@ add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 
 include(CTest)
 if (BUILD_TESTING)
-	add_executable(demo EXCLUDE_FROM_ALL test/test.cpp)
+	add_executable(demo test/demo.cpp)
 	target_link_libraries(demo PUBLIC ${PROJECT_NAME})
 
 	add_executable(nums test/nums.cpp)

@@ -42,7 +42,10 @@ namespace argparse
 		Arg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr, bool required=false):
 			vec(vec), name(name), help(help), required(required)
 		{ if (vec) { vec->push_back(this); } }
-		virtual bool fill(ArgIter &it) = 0;
+		//0: success
+		//1: missing arg
+		//2: parse error
+		virtual int fill(ArgIter &it) = 0;
 
 		Flagfmt flag() const { return {this}; }
 		Posfmt pos() const { return {this}; }
@@ -76,34 +79,33 @@ namespace argparse
 		return o;
 	}
 
-	template<>
-	bool store<const char*>(const char * &dst, const char *arg, int base)
+	//------------------------------
+	// creation from ArgIter.
+	//------------------------------
+	// assume it && !it.isflag
+	template<class T>
+	bool create(T &dst, ArgIter &it)
 	{
-		dst = arg;
+		if (store(dst, it.arg()))
+		{
+			it.step();
+			return true;
+		}
+		return false;
+	}
+
+	bool create(const char* &dst, ArgIter &it)
+	{
+		dst = it.arg();
+		it.step();
 		return true;
 	}
 
-	//Call set() count times on successive items while it returns true.
-	template<class TypedArg>
-	int fill(TypedArg &inst, int count, ArgIter &it)
+	bool create(std::string &dst, ArgIter &it)
 	{
-		for (int i=0; i<count; ++i)
-		{
-			if (!it || it.isflag || !inst.set(i, it.arg()))
-			{ return i; }
-			it.step();
-		}
-		return count;
-	}
-
-	//Print all items in a container as a list.
-	template<class T>
-	void printvals(std::ostream &o, const T &data)
-	{
-		o << ": [" << data[0];
-		for (int i=0; i<data.size(); ++i)
-		{ o << ", " << data[i]; }
-		o << ']';
+		dst = it.arg();
+		it.step();
+		return true;
 	}
 
 	//Difference between variable/fixed length multi-arg data.
@@ -112,13 +114,12 @@ namespace argparse
 	{
 		typedef std::array<T, count> type;
 		static void clear(type&){}
-		static bool set(type &arr, int i, const char *arg)
-		{ return store(arr[i], arg); }
-		static void fill(type &arr, const std::initializer_list<T> &l)
+		static bool set(type &arr, int i, ArgIter &it)
+		{ return create(arr[i], it); }
+		static void from_initializer(type &arr, const std::initializer_list<T> &l)
 		{
 			int i = 0;
-			for (auto &x : l)
-			{ arr[i++] = x; }
+			for (auto &x : l) { arr[i++] = x; }
 		}
 	};
 	template<class T, int count>
@@ -126,16 +127,36 @@ namespace argparse
 	{
 		typedef std::vector<T> type;
 		static void clear(type& t){ t.clear(); }
-		static bool set(type &arr, int i, const char *arg)
+		//Assume i is the length of arr
+		static bool set(type &arr, int i, ArgIter &it)
 		{
 			T item;
-			bool result = store(item, arg);
+			bool result = create(item, it);
 			if (result) { arr.push_back(item); }
 			return result;
 		}
-		static void fill(type &arr, const std::initializer_list<T> &l)
+		static void from_initializer(type &arr, const std::initializer_list<T> &l)
 		{ arr.assign(l.begin(), l.end()); }
 	};
+
+	//Print a list-like container.
+	template<class T>
+	void printvals(std::ostream &o, const T &data)
+	{
+		o << ": [";
+		auto it = data.begin();
+		if (it != data.end())
+		{
+			o << *it;
+			++it;
+			while (it != data.end())
+			{
+				o << ", " << *it;
+				++it;
+			}
+		}
+		o << ']';
+	}
 
 	//------------------------------
 	//General arg impl
@@ -169,7 +190,7 @@ namespace argparse
 						"The number of defaults should match the count for "
 						+ std::string(name));
 				}
-				Typehelp::fill(data, defaults);
+				Typehelp::from_initializer(data, defaults);
 			}
 		}
 		TypedArg(TypedArg &&other):
@@ -191,21 +212,32 @@ namespace argparse
 		}
 		void defaults(std::ostream &o) const override
 		{
-			if (ndefaults)
+			if (ndefaults || count < 0)
 			{
 				o << "(default: ";
 				printvals(o, data);
 				o << ')';
 			}
 		}
-		bool set(int i, const char *arg)
-		{ return Typehelp::set(data, i, arg); }
-		bool fill(ArgIter &it) override
+		int fill(ArgIter &it) override
 		{
 			Typehelp::clear(data);
-			int numparsed = argparse::fill(*this, count<0 ? it.argc : count, it);
-			if (count < 0) { return !required || numparsed > 0; }
-			else { return numparsed == count; }
+			const int num = count > 0 ? count : it.argc;
+			int numparsed = 0;
+			for (; numparsed<num; ++numparsed)
+			{
+				if (!it || it.isflag) { break; }
+				if (!Typehelp::set(data, numparsed, it))
+				{
+					if (count > 0) { return 2; }
+					break;
+				}
+			}
+			if (count < 0)
+			{ if (numparsed == 0 && required) { return 1; } }
+			else
+			{ if (numparsed != count) { return 1; } }
+			return 0;
 		}
 	};
 
@@ -252,11 +284,10 @@ namespace argparse
 		void defaults(std::ostream &o) const override
 		{ if (defaulted) { o << "(default: " << data << ')'; } }
 
-		bool fill(ArgIter &it) override
+		int fill(ArgIter &it) override
 		{
-			bool val = it && !it.isflag && store(data, it.arg());
-			if (val) { it.step(); }
-			return val;
+			if (!it || it.isflag) { return 1; }
+			return create(data, it) ? 0 : 2;
 		}
 	};
 
@@ -277,7 +308,7 @@ namespace argparse
 		{}
 
 		operator int() { return data; }
-		bool fill(ArgIter &it) override { ++data; return true; }
+		int fill(ArgIter &it) override { ++data; return 0; }
 		void flagspec(std::ostream &o) const override { o << name << "++"; }
 		void defaults(std::ostream &o) const override {}
 	};
@@ -314,7 +345,7 @@ namespace argparse
 		{}
 
 		operator bool() { return data; }
-		bool fill(ArgIter &it) override { data = !data; return true; }
+		int fill(ArgIter &it) override { data = !data; return 0; }
 		void flagspec(std::ostream &o) const override { o << name << "!!"; }
 		void defaults(std::ostream &o) const override
 		{ o << "(default: " << (data ? "true" : "false") << ')'; }

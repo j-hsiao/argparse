@@ -55,6 +55,10 @@ flag arguments.
 `structtype add<type, count=1>(
   const char *name, const char *help [, std::initializer_list<type> defaults])`
 
+`structtype add<type, count=1>(
+  std::initializer_list<const char*> names, const char *help
+  [, std::initializer_list<type> defaults])`
+
 This returns a struct that can act as the corresponding argument.  The
 underlying data is accessible via the `.data` member.  The struct will
 also define conversion operators and appropriate methods.
@@ -85,7 +89,11 @@ This has some exceptions when `type` is `bool`:
   the value of the argument is flipped.
 
 `name`: The name of the argument.  If it starts with the prefix char,
-it is a flag.  Otherwise, it is a positional argument.
+it is a flag.  Otherwise, it is a positional argument.  In the case of
+the initializer list, the 1st string is the flag and the rest are
+aliases that point to the flag.  Aliases are essentially the same as
+normal flags for flag matching purposes.  However, the specified flag
+and corresponding aliases all share the same struct.
 
 `help`: A help message describing the argument.
 
