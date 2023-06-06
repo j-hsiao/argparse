@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 	std::cerr << "invert: " << invert << std::endl;
 
 	std::cerr << "rscale: " << rscale << std::endl;
-	std::cerr << "rvec: " << rvec[0] << ',' << rvec[1] << std::endl;
+	std::cerr << "rvec: " << (*rvec)[0] << ',' << (*rvec)[1] << std::endl;
 	std::cerr << "rseq";
 	argparse::printvals(std::cerr, rseq.data);
 	std::cerr << std::endl;
@@ -65,13 +65,13 @@ int main(int argc, char *argv[])
 	{ std::cerr << "scale: " << scale << std::endl; }
 	else
 	{ std::cerr << "-scale was not parsed" << std::endl; }
-	std::cerr << "vec: " << vec[0] << ',' << vec[1] << std::endl;
+	std::cerr << "vec: " << (*vec)[0] << ',' << (*vec)[1] << std::endl;
 	std::cerr << "seq";
 	argparse::printvals(std::cerr, seq.data);
 	std::cerr << std::endl;
 
 	std::cerr << "rpscale: " << rpscale << std::endl;
-	std::cerr << "rpvec: " << rpvec[0] << ',' << rpvec[1] << std::endl;
+	std::cerr << "rpvec: " << (*rpvec)[0] << ',' << (*rpvec)[1] << std::endl;
 	std::cerr << "rpseq";
 	argparse::printvals(std::cerr, rpseq.data);
 	std::cerr << std::endl;
@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
 	else
 	{ std::cerr << "pscale was not parsed." << std::endl; }
 
-	std::cerr << "pvec: " << pvec[0] << ',' << pvec[1] << std::endl;
+	std::cerr << "pvec: " << (*pvec)[0] << ',' << (*pvec)[1] << std::endl;
 	if (!result.parsed("pvec"))
 	{ std::cerr << "pvec was not parsed." << std::endl; }
 

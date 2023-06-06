@@ -39,14 +39,14 @@ int main(int argc, char *argv[])
 		argparse::TypedArg<int, 3> arg("xyz", "3 values, x, y, z, ints", nullptr, {1,2,3});
 		auto a = args("52", "37", "--1", "-49");
 		assert(!arg.required);
-		assert(arg[0] == 1);
-		assert(arg[1] == 2);
-		assert(arg[2] == 3);
+		assert((*arg)[0] == 1);
+		assert((*arg)[1] == 2);
+		assert((*arg)[2] == 3);
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(arg.fill(it) == 0);
-		assert(arg[0] == 52);
-		assert(arg[1] == 37);
-		assert(arg[2] == -49);
+		assert((*arg)[0] == 52);
+		assert((*arg)[1] == 37);
+		assert((*arg)[2] == -49);
 		std::stringstream s;
 		s << arg.pos();
 		assert(s.str() == "xyz x3");
@@ -60,8 +60,8 @@ int main(int argc, char *argv[])
 		assert(arg.required);
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(arg.fill(it) == 2);
-		assert(arg[0] == 52);
-		assert(arg[1] == 37);
+		assert((*arg)[0] == 52);
+		assert((*arg)[1] == 37);
 		assert(it.pos == 3);
 	}
 
@@ -71,12 +71,12 @@ int main(int argc, char *argv[])
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(!arg.required);
 		assert(arg.fill(it) == 0);
-		assert(arg.size() == 2);
-		assert(arg[0] == 52);
-		assert(arg[1] == 37);
+		assert(arg->size() == 2);
+		assert((*arg)[0] == 52);
+		assert((*arg)[1] == 37);
 		assert(it.pos == 3);
 		assert(arg.fill(it) == 0);
-		assert(arg.size() == 0);
+		assert(arg->size() == 0);
 
 		std::stringstream s;
 		s << arg.pos();
@@ -146,12 +146,12 @@ int main(int argc, char *argv[])
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(ptrs.size() == 1);
 		assert(ptrs[0] == &arg);
-		assert(arg[0] == 1.0);
-		assert(arg[1] == 2.0);
+		assert((*arg)[0] == 1.0);
+		assert((*arg)[1] == 2.0);
 		assert(ptrs[0]->fill(it) == 0);
 		assert(it.pos == 3);
-		assert(arg[0] == 52.0);
-		assert(arg[1] == 37.0);
+		assert((*arg)[0] == 52.0);
+		assert((*arg)[1] == 37.0);
 	}
 
 	{
@@ -162,9 +162,9 @@ int main(int argc, char *argv[])
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(arg.fill(it) == 0);
 		assert(it.pos == it.argc);
-		assert(!std::strcmp(arg[0], "52"));
-		assert(!std::strcmp(arg[1], "37"));
-		assert(!std::strcmp(arg[2], "notanumber"));
+		assert(!std::strcmp((*arg)[0], "52"));
+		assert(!std::strcmp((*arg)[1], "37"));
+		assert(!std::strcmp((*arg)[2], "notanumber"));
 	}
 
 	{
@@ -175,6 +175,10 @@ int main(int argc, char *argv[])
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(arg.fill(it) == 0);
 		assert(it.pos == it.argc);
+		//? can't find anywhere that explicitly
+		//says that arg[0] would cause user-defined conversion
+		//operator to T* (at least that's what i think is
+		//happening here...)
 		assert(arg[0] == 82);
 		assert(arg[1] == 55);
 		assert(arg[2] == 4011);
@@ -186,8 +190,8 @@ int main(int argc, char *argv[])
 		auto a = args("52", "37", "--1", "FAB");
 		argparse::ArgIter it(a.size(), a.args, "-");
 		assert(arg.fill(it) == 0);
-		assert(arg.data.x == 52);
-		assert(arg.data.y == 37);
+		assert(arg->x == 52);
+		assert(arg->y == 37);
 	}
 
 

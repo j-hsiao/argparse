@@ -60,8 +60,9 @@ flag arguments.
   [, std::initializer_list<type> defaults])`
 
 This returns a struct that can act as the corresponding argument.  The
-underlying data is accessible via the `.data` member.  The struct will
-also define conversion operators and appropriate methods.
+underlying data is accessible via the `.data` member.  The struct also
+has dereference and arrow operator.  Multi args also have conversion
+operator to `T*`.
 
 `type`: The type of the argument.  Integral arguments are parsed using
 base 10.  To use other bases, use `argparse::Base<type, base>` as the

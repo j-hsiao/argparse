@@ -199,10 +199,16 @@ namespace argparse
 			ndefaults(other.ndefaults)
 		{}
 
-		decltype(data.size()) size() const { return data.size(); }
-		T& operator[](std::size_t idx) { return data[idx]; }
-		decltype(data.begin()) begin() { return data.begin(); }
-		decltype(data.end()) end() { return data.end(); }
+		//Where in standard says that this
+		//would cause something like
+		//TypedArg<T,3> x; x[0]
+		//to call T* conversion operator? not sure...
+		operator T*() { return data.data(); }
+		operator const T*() const { return data.data(); }
+		decltype(data)& operator*() { return data; }
+		const decltype(data)& operator*() const { return data; }
+		decltype(data)* operator->() { return &data; }
+		const decltype(data)* operator->() const { return &data; }
 
 		void flagspec(std::ostream &o) const override
 		{
@@ -210,6 +216,7 @@ namespace argparse
 			if (count < 0) { o << " ..."; }
 			else { o << " x" << count; }
 		}
+
 		void defaults(std::ostream &o) const override
 		{
 			if (ndefaults || count < 0)
@@ -276,6 +283,11 @@ namespace argparse
 			defaulted(other.defaulted)
 		{}
 
+		T& operator*() { return data; }
+		const T& operator*() const { return data; }
+		T* operator->() { return &data; }
+		const T* operator->() const { return &data; }
+
 		operator T() { return data; }
 		virtual void flagspec(std::ostream &o) const
 		{ o << name << ' ' << name; }
@@ -306,6 +318,9 @@ namespace argparse
 			Arg(std::move(static_cast<Arg&>(other))),
 			data(other.data)
 		{}
+
+		int& operator*() { return data; }
+		const int& operator*() const { return data; }
 
 		operator int() { return data; }
 		int fill(ArgIter &it) override { ++data; return 0; }
@@ -343,6 +358,9 @@ namespace argparse
 			Arg(std::move(static_cast<Arg&>(other))),
 			data(other.data)
 		{}
+
+		bool& operator*() { return data; }
+		const bool& operator*() const { return data; }
 
 		operator bool() { return data; }
 		int fill(ArgIter &it) override { data = !data; return 0; }
