@@ -60,9 +60,16 @@ int main(int argc, char *argv[])
 		p.dohelp("programname", 2);
 	}
 
+	{
+		argparse::Parser p;
+		auto cam = p.group("camera");
+		auto camname = cam.add<const char*>("name", "name of the camera source.");
+		auto fps = cam.add<float>("-fps", "frames per second", {25});
+		auto resolution = cam.add<int, 2>({"-shape", "-s"}, "shape of frame, width height", {1920, 1080});
 
+		p.dohelp("prog", 1);
+		p.dohelp("prog", 2);
 
-
-
+	}
 	return 0;
 }

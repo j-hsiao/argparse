@@ -36,18 +36,22 @@ int main(int argc, char *argv[])
 	auto dun = p.add<int>({"-dun", "-duk", "-dur"}, "", {});
 	auto d = p.add<int>("-d", "", {});
 
+	auto cam_args = p.group("camera");
+	auto name = cam_args.add<const char *>("camname", "the camera name.");
+	auto fps = cam_args.add<float>("-fps", "The frames per second.", {30});
+
 	auto result = p.parse(argc, argv);
 
 	if (!result)
 	{
 		if (result.code == 1)
 		{
-			std::cerr << "help message" << std::endl;
+			std::cerr << "Exit because help message" << std::endl;
 			return 0;
 		}
 		else
 		{
-			std::cerr << "parse error" << std::endl;
+			std::cerr << "Exit because parse error" << std::endl;
 			return 1;
 		}
 	}

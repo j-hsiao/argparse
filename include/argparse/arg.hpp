@@ -26,6 +26,14 @@
 
 namespace argparse
 {
+	struct Arg;
+
+	struct ArgRegistry
+	{
+		virtual void push_back(Arg *arg) = 0;
+		virtual Arg*& back() = 0;
+	};
+
 	//The vec arg allows the Arg to be added to a list
 	//without the user having to explicitly add it.
 	//Simplifies user interface.
@@ -34,14 +42,14 @@ namespace argparse
 		struct Flagfmt { const Arg* arg; };
 		struct Posfmt { const Arg* arg; };
 
-		std::vector<Arg*> *vec;
+		ArgRegistry *reg;
 		const char *name;
 		const char *help;
 		bool required;
 
-		Arg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr, bool required=false):
-			vec(vec), name(name), help(help), required(required)
-		{ if (vec) { vec->push_back(this); } }
+		Arg(const char *name, const char *help, ArgRegistry *reg=nullptr, bool required=false):
+			reg(reg), name(name), help(help), required(required)
+		{ if (reg) { reg->push_back(this); } }
 		//0: success
 		//1: missing arg
 		//2: parse error
@@ -55,15 +63,15 @@ namespace argparse
 		virtual void defaults(std::ostream &o) const = 0;
 
 		Arg(Arg &&other):
-			vec(other.vec),
+			reg(other.reg),
 			name(other.name),
 			help(other.help),
 			required(other.required)
 		{
-			if (vec)
+			if (reg)
 			{
-				if (vec->back() == &other) { vec->back() = this; }
-				else { vec->push_back(this); }
+				if (reg->back() == &other) { reg->back() = this; }
+				else { reg->push_back(this); }
 			}
 		}
 	};
@@ -168,17 +176,17 @@ namespace argparse
 		typename Typehelp::type data;
 		int ndefaults;
 
-		TypedArg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr):
-			Arg(name, help, vec, true),
+		TypedArg(const char *name, const char *help, ArgRegistry *reg=nullptr):
+			Arg(name, help, reg, true),
 			data{},
 			ndefaults(0)
 		{}
 
 		TypedArg(
 			const char *name, const char *help,
-			std::vector<Arg*> *vec, std::initializer_list<T> defaults
+			ArgRegistry *reg, std::initializer_list<T> defaults
 		):
-			Arg(name, help, vec, false),
+			Arg(name, help, reg, false),
 			data{},
 			ndefaults(defaults.size())
 		{
@@ -256,17 +264,17 @@ namespace argparse
 	{
 		T data;
 		bool defaulted;
-		TypedArg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr):
-			Arg(name, help, vec, true),
+		TypedArg(const char *name, const char *help, ArgRegistry *reg=nullptr):
+			Arg(name, help, reg, true),
 			data{},
 			defaulted(false)
 		{}
 
 		TypedArg(
 			const char *name, const char *help,
-			std::vector<Arg*> *vec, std::initializer_list<T> defaults
+			ArgRegistry *reg, std::initializer_list<T> defaults
 		):
-			Arg(name, help, vec, false),
+			Arg(name, help, reg, false),
 			data{},
 			defaulted(defaults.size() > 0)
 		{
@@ -310,8 +318,8 @@ namespace argparse
 	struct TypedArg<bool, 1>: public Arg
 	{
 		int data;
-		TypedArg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr):
-			Arg(name, help, vec, false),
+		TypedArg(const char *name, const char *help, ArgRegistry *reg=nullptr):
+			Arg(name, help, reg, false),
 			data(0)
 		{}
 		TypedArg(TypedArg &&other):
@@ -336,16 +344,16 @@ namespace argparse
 	{
 		bool data;
 
-		TypedArg(const char *name, const char *help, std::vector<Arg*> *vec=nullptr):
-			Arg(name, help, vec, false),
+		TypedArg(const char *name, const char *help, ArgRegistry *reg=nullptr):
+			Arg(name, help, reg, false),
 			data(false)
 		{}
 
 		TypedArg(
 			const char *name, const char *help,
-			std::vector<Arg*> *vec, std::initializer_list<bool> defaults
+			ArgRegistry *reg, std::initializer_list<bool> defaults
 		):
-			Arg(name, help, vec, false),
+			Arg(name, help, reg, false),
 			data(defaults.size() ? *defaults.begin() : false)
 		{
 			if (defaults.size() > 1)

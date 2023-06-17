@@ -18,8 +18,17 @@ namespace argparse
 	template<>
 	struct isbool<bool> { static const bool value = true; };
 
-	struct Parser
+	struct Parser: public ArgRegistry
 	{
+		struct Arginfo
+		{
+			Arg *arg;
+			const char *groupname;
+			operator Arg*&() { return arg; }
+			Arg& operator*() { return *arg; }
+			Arg* operator->() { return arg; }
+		};
+
 		struct Alias
 		{
 			const char *name;
@@ -27,10 +36,12 @@ namespace argparse
 		};
 		const char *help;
 		const char *prefix;
-		std::vector<Arg*> pos;
-		std::vector<Arg*> flags;
+		std::vector<Arginfo> pos;
+		std::vector<Arginfo> flags;
 		std::vector<Alias> aliases;
 		std::ostream &ostream;
+		Arginfo *lastarg;
+		std::vector<const char *> groups;
 
 		struct ParseResult
 		{
@@ -70,7 +81,9 @@ namespace argparse
 			prefix(prefix),
 			pos(),
 			flags(),
-			ostream(out)
+			ostream(out),
+			lastarg(nullptr),
+			groups{}
 		{}
 
 		//Add required argument
@@ -149,7 +162,7 @@ namespace argparse
 				}
 				++poscheck;
 			}
-			for (Arg *flag : flags)
+			for (auto &flag : flags)
 			{
 				if (flag->required)
 				{
@@ -177,7 +190,7 @@ namespace argparse
 		//Ensure bool, 0|1 is flag
 		//return appropriate vector to store argument.
 		template<class T, int count>
-		std::vector<Arg*>* check(const char *name)
+		Parser* check(const char *name)
 		{
 			bool isflag = name[0] == prefix[0];
 			if (isbool<T>::value && (count == 0 || count == 1) && !isflag)
@@ -185,7 +198,17 @@ namespace argparse
 				throw std::logic_error(
 					std::string(name) + " is <bool, [0|1]> but must be a flag.");
 			}
-			return isflag ? &flags : &pos;
+			if (isflag)
+			{
+				flags.push_back({nullptr, nullptr});
+				lastarg = &flags.back();
+			}
+			else
+			{
+				pos.push_back({nullptr, nullptr});
+				lastarg = &pos.back();
+			}
+			return this;
 		}
 
 		const char *flagstart(const char *name)
@@ -271,27 +294,44 @@ namespace argparse
 		void dohelp(const char *program, int level)
 		{
 			if (level < 1) { return; }
-			const char *wraps[] = {"[]", "<>"};
+			const char * const wraps[] = {"[]", "<>"};
 			ostream << "Usage: " << (program ? program : "program");
-			for (Arg *a : flags)
+			for (auto &a : flags)
 			{
 				ostream << ' ' << wraps[a->required][0]
 					<< prefix << a->flag() << wraps[a->required][1];
 			}
-			for (Arg *a : pos)
+			for (auto &a : pos)
 			{
 				ostream << ' ' << wraps[a->required][0]
 					<< a->pos() << wraps[a->required][1];
 			}
 			ostream << std::endl;
 			if (level < 2) { return; }
-			if (help) { ostream << std::endl << help << std::endl; }
+			longhelp();
+			for (const char *group : groups)
+			{ longhelp(group); }
+		}
+
+		void longhelp(const char *group=nullptr)
+		{
+			const char * const wraps[] = {"[]", "<>"};
+			if (group)
+			{ ostream << std::endl << group << ':' << std::endl; }
+			else if (help)
+			{ ostream << std::endl << help << std::endl << std::endl; }
+			bool header = !group;
 			if (flags.size())
 			{
-				ostream << std::endl << "Flags:" << std::endl;
-				for (Arg *a : flags)
+				for (auto &a : flags)
 				{
-					ostream << wraps[a->required][0] << prefix << a->flag()
+					if (a.groupname != group) { continue; }
+					if (header)
+					{
+						ostream << std::endl << "Flags:" << std::endl;
+						header = false;
+					}
+					ostream << "  " << wraps[a->required][0] << prefix << a->flag()
 						<< wraps[a->required][1];
 					a->defaults(ostream);
 					ostream << std::endl;
@@ -318,10 +358,16 @@ namespace argparse
 			}
 			if (pos.size())
 			{
-				ostream << std::endl << "Positionals:" << std::endl;
-				for (Arg *a : pos)
+				header = !group;
+				for (auto &a : pos)
 				{
-					ostream << wraps[a->required][0] << a->pos()
+					if (a.groupname != group) { continue; }
+					if (header)
+					{
+						ostream << std::endl << "Positionals:" << std::endl;
+						header = false;
+					}
+					ostream << "  " << wraps[a->required][0] << a->pos()
 						<< wraps[a->required][1];
 					a->defaults(ostream);
 					ostream << std::endl;
@@ -429,225 +475,67 @@ namespace argparse
 			}
 		}
 
+		virtual void push_back(Arg *arg) override
+		{
+			if (!lastarg->arg)
+			{ lastarg->arg = arg; }
+			else
+			{
+				throw std::logic_error(
+					"push_back should only be called once per arg.");
+			}
+		}
+		virtual Arg*& back() override
+		{ return *lastarg; }
 
+		struct Group
+		{
+			Parser *parent;
+			const char *groupname;
+
+			template<class T, int count=1>
+			TypedArg<T, count> add(const char *name, const char *help)
+			{
+				auto x = parent->add<T, count>(name, help);
+				parent->lastarg->groupname = groupname;
+				return x;
+			}
+
+			template<class T, int count=1>
+			TypedArg<T, count> add(
+				const char *name, const char *help,
+				std::initializer_list<T> defaults)
+			{
+				auto x = parent->add<T, count>(name, help, defaults);
+				parent->lastarg->groupname = groupname;
+				return x;
+			}
+
+			template<class T, int count=1>
+			TypedArg<T, count> add(
+				std::initializer_list<const char*> names, const char *help)
+			{
+				auto x = parent->add<T, count>(names, help);
+				parent->lastarg->groupname = groupname;
+				return x;
+			}
+
+			template<class T, int count=1>
+			TypedArg<T, count> add(
+				std::initializer_list<const char*> names, const char *help,
+				std::initializer_list<T> defaults)
+			{
+				auto x = parent->add<T, count>(names, help, defaults);
+				parent->lastarg->groupname = groupname;
+				return x;
+			}
+		};
+		
+		Group group(const char *name)
+		{
+			groups.push_back(name);
+			return {this, name};
+		}
 	};
-
-//	template<class T, class V>
-//	struct is_type { static const bool value = false; };
-//	template<class T>
-//	struct is_type<T, T> { static const bool value = true; };
-//
-//	static const char Help[] = "help";
-//	struct Parser
-//	{
-//		std::vector<Arg*> flags;
-//		std::vector<Arg*> fflags;
-//		std::vector<Arg*> positionals;
-//		const char *help;
-//		const char *prefix;
-//		std::ostream *logstream;
-//		std::size_t helplevel;
-//		int base;
-//		bool helpmask[4];
-//
-//		//help: help str for parser
-//		//prefix: prefix for flags
-//		//base: base for number parsing.
-//		Parser(const char *help="", const char *prefix="-", int base=10, std::ostream *logstream=&std::cerr):
-//			help(help), prefix(prefix), logstream(logstream), helplevel(0), base(base)
-//		{}
-//
-//		template<class T, int N=1>
-//		decltype(((TypedArg<T, N>*)nullptr)->ref()) add(
-//			const char *name, const char *help, decltype(TypedArg<T, N>::value) value, bool required)
-//		{
-//			auto offset = std::strspn(name, prefix);
-//			if (is_type<T, bool>::value && (N == 0 || N == 1) && !offset)
-//			{ throw std::logic_error("Single bool args should be flags."); }
-//			auto *ptr = new TypedArg<T, N>(name+offset, help, value, required);
-//			if (offset > 1)
-//			{
-//				fflags.push_back(ptr);
-//				const char *check = name+offset;
-//				int i = 0;
-//				while (Help[i] && check[i] == Help[i]) { ++i; }
-//				if (i && !check[i]) { helpmask[i-1] = 1; }
-//			}
-//			else if (offset)
-//			{
-//				flags.push_back(ptr);
-//				const char *check = name+offset;
-//				int i=0;
-//				while (Help[i] && check[i] == Help[i])
-//				{ helpmask[i++] = 1; }
-//			}
-//			else { positionals.push_back(ptr); }
-//			return ptr->ref();
-//		}
-//
-//		template<class T, int N=1>
-//		decltype(((TypedArg<T, N>*)nullptr)->ref()) add(const char *name, const char *help="")
-//		{ return add<T,N>(name, help, {}, true); }
-//		template<class T, int N=1>
-//		decltype(((TypedArg<T, N>*)nullptr)->ref()) add(
-//			const char *name, const char *help, decltype(TypedArg<T, N>::value) value)
-//		{ return add<T,N>(name, help, value, false); }
-//
-//		//Search for a matching flag.
-//		Arg* findflag(RawArgs &args)
-//		{
-//			for (Arg *cand: fflags)
-//			{ if (args.prefixes(cand->name) == args.Full) { return cand; } }
-//			Arg *best = nullptr;
-//			int count = 0;
-//			for (Arg *cand : flags)
-//			{
-//				if (int val = args.prefixes(cand->name))
-//				{
-//					if (val == args.Full) { return cand; }
-//					if (!(count++)) { best = cand; }
-//					else { best = nullptr; }
-//				}
-//			}
-//			if (count > 1 && logstream)
-//			{ *logstream << "Ambiguous flag: " << args.argv[0] << std::endl; }
-//			return best;
-//		}
-//
-//		void doshort(const char *program, std::ostream &o)
-//		{
-//			o << "Usage: " << program;
-//			for (auto *flag: flags)
-//			{ flag->helpshort(o << ' ', prefix); }
-//			for (auto *pos: positionals)
-//			{ pos->helpshort(o << ' '); }
-//			o << std::endl;
-//		}
-//		void dolong(const char *program, std::ostream &o)
-//		{
-//			doshort(program, o);
-//			if (help[0]) { o << std::endl << help << std::endl; }
-//			if (flags.size() || fflags.size()) { o << std::endl << "Flags:" << std::endl; }
-//			for (auto &flaglist : {fflags, flags})
-//			{
-//				for (auto *flag: flaglist)
-//				{
-//					flag->helpshort(o << "  ", prefix);
-//					flag->helplong(o);
-//					o << std::endl;
-//				}
-//			}
-//			if (positionals.size()) { o << std::endl << "Positionals:" << std::endl; }
-//			for (auto *pos: positionals)
-//			{
-//				pos->helpshort(o << "  ");
-//				pos->helplong(o);
-//				o << std::endl;
-//			}
-//		}
-//		//return whether help was done.
-//		bool dohelp(int argc, char *argv[], const char *program)
-//		{
-//			RawArgs args(argc, argv, prefix, base);
-//			helplevel = 0;
-//			for (; args; args.step())
-//			{
-//				if (args.isflag)
-//				{
-//					const char *arg = args.argv[0] + args.isflag;
-//					std::size_t i = 0;
-//					while (Help[i] && arg[i] == Help[i]) { ++i; }
-//					if (
-//						i && !arg[i] && (!helpmask[i-1] || args.isflag == 2)
-//						&& i > helplevel)
-//					{ helplevel = i; }
-//				}
-//			}
-//			if (logstream)
-//			{
-//				if (helplevel >= 4) { dolong(program, *logstream); }
-//				else if (helplevel > 0) { doshort(program, *logstream); }
-//			}
-//			return helplevel > 0;
-//		}
-//
-//		// The program name should be argv[0].
-//		bool parse(int argc, char *argv[])
-//		{
-//			char *pname = std::strrchr(argv[0], '/');
-//			return parse(argc-1, argv+1, pname ? pname+1 : argv[0]);
-//		}
-//
-//		//Parse without program in argv.
-//		bool parse(int argc, char *argv[], const char *program)
-//		{
-//			//args are mutated from parsing, so must search for help first.
-//			if (dohelp(argc, argv, program)) { return false; }
-//			RawArgs args(argc, argv, prefix, base);
-//			auto pit = positionals.begin();
-//			while (args)
-//			{
-//				Arg *curarg = nullptr;
-//				if (args.isflag) { if (!(curarg = findflag(args))) { return false; } }
-//				else if (pit != positionals.end()) { curarg = *(pit++); }
-//				if (curarg)
-//				{
-//					if (args.isflag) { args.step(); }
-//					if (!curarg->parse(args))
-//					{
-//						if (args)
-//						{
-//							std::cerr << "Error parsing token \""
-//								<< args.argv[0] << "\" for \"" << curarg->name
-//								<< '"' << std::endl;
-//						}
-//						else
-//						{
-//							std::cerr << "Missing arguments for \""
-//								<< curarg->name << '"' << std::endl;
-//						}
-//						return false;
-//					}
-//				}
-//				else
-//				{
-//					std::cerr << "unrecognized " << (args.isflag ? "flag" : "positional")
-//						<< " \"" << args.argv[0] << '"' << std::endl;
-//					return false;
-//				}
-//			}
-//			while (pit != positionals.end())
-//			{
-//				if (!(*pit)->parse(args))
-//				{
-//					std::cerr << "Missing arguments for \""
-//						<< (*pit)->name << '"' << std::endl;
-//					return false;
-//				}
-//				++pit;
-//			}
-//			for (auto &flaglist : {fflags, flags})
-//			{
-//				for (Arg *flag : flaglist)
-//				{
-//					if (flag->required)
-//					{
-//						std::cerr << "Missing required flag \"" << prefix << flag->name
-//							<< '"' << std::endl;
-//						return false;
-//					}
-//				}
-//			}
-//			return true;
-//		}
-//
-//		~Parser()
-//		{
-//			for (Arg *arg : flags)
-//			{ delete arg; }
-//			for (Arg *arg : positionals)
-//			{ delete arg; }
-//		}
-//	};
 }
 #endif // ARGPARSE_HPP

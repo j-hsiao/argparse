@@ -26,6 +26,19 @@ std::ostream& operator<<(std::ostream &o, const Point &p)
 	return o;
 }
 
+struct Reg: public argparse::ArgRegistry
+{
+	std::vector<argparse::Arg*> vec;
+	void push_back(argparse::Arg *arg) override
+	{ vec.push_back(arg); }
+
+	argparse::Arg*& back() override
+	{ return vec.back(); }
+
+	std::size_t size() const { return vec.size(); }
+	argparse::Arg* operator[](std::size_t idx) { return vec[idx]; }
+};
+
 int main(int argc, char *argv[])
 {
 	try
@@ -139,7 +152,7 @@ int main(int argc, char *argv[])
 	}
 
 	{
-		std::vector<argparse::Arg*> ptrs;
+		Reg ptrs;
 		argparse::TypedArg<double, 2> arg("xy", "x, y coordinate", &ptrs, {1,2});
 		assert(!arg.required);
 		auto a = args("52", "37", "--1", "notanumber");
@@ -155,7 +168,7 @@ int main(int argc, char *argv[])
 	}
 
 	{
-		std::vector<argparse::Arg*> ptrs;
+		Reg ptrs;
 		argparse::TypedArg<const char*, 3> arg("xy", "x, y coordinate", &ptrs, {});
 		assert(!arg.required);
 		auto a = args("52", "37", "--1", "notanumber");
@@ -168,7 +181,7 @@ int main(int argc, char *argv[])
 	}
 
 	{
-		std::vector<argparse::Arg*> ptrs;
+		Reg ptrs;
 		argparse::TypedArg<argparse::Base<int, 16>, 3> arg("xy", "x, y coordinate", &ptrs);
 		assert(arg.required);
 		auto a = args("52", "37", "--1", "FAB");
