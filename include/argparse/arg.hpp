@@ -151,7 +151,7 @@ namespace argparse
 	template<class T>
 	void printvals(std::ostream &o, const T &data)
 	{
-		o << ": [";
+		o << "[";
 		auto it = data.begin();
 		if (it != data.end())
 		{

@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
 	auto d = p.add<int>("-d", "", {});
 
 	auto cam_args = p.group("camera");
-	auto name = cam_args.add<const char *>("camname", "the camera name.");
+	auto name = cam_args.add<const char *>("camname", "the camera name.", {"/dev/video0"});
 	auto fps = cam_args.add<float>("-fps", "The frames per second.", {30});
 
 	auto result = p.parse(argc, argv);
@@ -94,6 +94,9 @@ int main(int argc, char *argv[])
 	std::cerr << std::endl;
 	if (!result.parsed("pseq"))
 	{ std::cerr << "pseq was not parsed." << std::endl; }
+
+	std::cerr << "camera: " << name << std::endl;
+	std::cerr << "fps: " << fps << std::endl;
 
 	return 0;
 }

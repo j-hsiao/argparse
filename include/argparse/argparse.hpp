@@ -145,7 +145,12 @@ namespace argparse
 			while (it)
 			{
 				if (it.isflag)
-				{ parse_flag(it, ret); }
+				{
+					if (it.breakpoint())
+					{ it.step(); }
+					else
+					{ parse_flag(it, ret); }
+				}
 				else
 				{ parse_pos(it, ret); }
 				if (ret.code) { return ret; }

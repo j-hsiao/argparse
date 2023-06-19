@@ -1,8 +1,12 @@
 // Iterate on arguments.
 // special arguments (assume prefix = '-'):
-//   --     Treat all remaining arguments as positional.
-//   --N    N: a number, treat the next N arguments as positional.
+//   --     Treat all remaining arguments as non-flags.
+//   --N    N: a number, treat the next N arguments as non-flags.
 //          (no trailing characters after the number)
+//   --0    Explicitly break an argument sequence.  This acts like a
+//          flag, but it has no meaning.  Users should call breakpoint()
+//          to check if the argument is a flag or is just this
+//          breakpoint flag.
 //
 #ifndef ARGPARSE_ARGITER_HPP
 #define ARGPARSE_ARGITER_HPP
@@ -38,6 +42,9 @@ namespace argparse
 			step();
 		}
 
+		bool breakpoint() const
+		{ return isflag && argv[pos][isflag] == '0' && !argv[pos][isflag+1]; }
+
 		//step to the next arg.
 		void step()
 		{
@@ -59,13 +66,18 @@ namespace argparse
 					forcepos = static_cast<int>(std::strtoll(remain, &end, 10));
 					//outof range gives acceptable values. (skip all remaining)
 					if (!end[0])
-					{ step(); }
+					{ if (forcepos) { step(); } }
 					else
 					{ forcepos = 0; }
 				}
 				else
-				{ forcepos = -1; }
+				{
+					forcepos = -1;
+					step();
+				}
 			}
+			else if (!argv[pos][isflag])
+			{ isflag = 0; }
 		}
 
 		//name of flag without prefix chars
@@ -77,13 +89,6 @@ namespace argparse
 
 		//current argument
 		const char* arg() const { return argv[pos]; }
-
-
-
 	};
-
-
-
-
 }
 #endif //ARGPARSE_ARGITER_HPP
