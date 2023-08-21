@@ -89,6 +89,10 @@ This has some exceptions when `type` is `bool`:
   is a toggle flag.  That is to say, every time the flag is encountered,
   the value of the argument is flipped.
 
+To help remember which is which, 0 is a circle so the bool will cycle
+between true/false with each successive flag.  1 is more like a
+line/arrow so it increments with each flag.
+
 `name`: The name of the argument.  If it starts with the prefix char,
 it is a flag.  Otherwise, it is a positional argument.  In the case of
 the initializer list, the 1st string is the flag and the rest are

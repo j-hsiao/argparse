@@ -39,6 +39,8 @@ int main(int argc, char *argv[])
 	auto cam_args = p.group("camera");
 	auto name = cam_args.add<const char *>("camname", "the camera name.", {"/dev/video0"});
 	auto fps = cam_args.add<float>("-fps", "The frames per second.", {30});
+	auto boolcount = cam_args.add<bool, 1>("-boolcount", "count bools", {5});
+	auto boolr = cam_args.add<bool, 0>("-boolr", "count bools", {true});
 
 	auto result = p.parse(argc, argv);
 
@@ -97,6 +99,8 @@ int main(int argc, char *argv[])
 
 	std::cerr << "camera: " << name << std::endl;
 	std::cerr << "fps: " << fps << std::endl;
+	std::cerr << "boolcount: " << boolcount << std::endl;
+	std::cerr << "boolr: " << boolr << std::endl;
 
 	return 0;
 }

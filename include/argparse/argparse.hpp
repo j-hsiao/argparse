@@ -98,7 +98,7 @@ namespace argparse
 		template<class T, int count=1>
 		TypedArg<T, count> add(
 			const char *name, const char *help,
-			std::initializer_list<T> defaults)
+			std::initializer_list<typename TypedArg<T, count>::rawtype> defaults)
 		{
 			return TypedArg<T, count>(
 				flagstart(name), help, check<T, count>(name), defaults);
@@ -117,7 +117,7 @@ namespace argparse
 		template<class T, int count=1>
 		TypedArg<T, count> add(
 			std::initializer_list<const char*> names, const char *help,
-			std::initializer_list<T> defaults)
+			std::initializer_list<typename TypedArg<T, count>::rawtype> defaults)
 		{
 			add_aliases(names);
 			const char *name = *names.begin();
@@ -509,7 +509,7 @@ namespace argparse
 			template<class T, int count=1>
 			TypedArg<T, count> add(
 				const char *name, const char *help,
-				std::initializer_list<T> defaults)
+				std::initializer_list<typename TypedArg<T, count>::rawtype> defaults)
 			{
 				auto x = parent->add<T, count>(name, help, defaults);
 				parent->lastarg->groupname = groupname;
@@ -528,7 +528,7 @@ namespace argparse
 			template<class T, int count=1>
 			TypedArg<T, count> add(
 				std::initializer_list<const char*> names, const char *help,
-				std::initializer_list<T> defaults)
+				std::initializer_list<typename TypedArg<T, count>::rawtype> defaults)
 			{
 				auto x = parent->add<T, count>(names, help, defaults);
 				parent->lastarg->groupname = groupname;

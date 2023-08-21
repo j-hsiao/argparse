@@ -174,6 +174,7 @@ namespace argparse
 	{
 		typedef MultiDataType<T, count> Typehelp;
 		typename Typehelp::type data;
+		typedef T rawtype;
 		int ndefaults;
 
 		TypedArg(const char *name, const char *help, ArgRegistry *reg=nullptr):
@@ -262,6 +263,7 @@ namespace argparse
 	template <class T>
 	struct TypedArg<T, 1>: public Arg
 	{
+		typedef T rawtype;
 		T data;
 		bool defaulted;
 		TypedArg(const char *name, const char *help, ArgRegistry *reg=nullptr):
@@ -317,11 +319,28 @@ namespace argparse
 	template<>
 	struct TypedArg<bool, 1>: public Arg
 	{
+		typedef int rawtype;
 		int data;
 		TypedArg(const char *name, const char *help, ArgRegistry *reg=nullptr):
 			Arg(name, help, reg, false),
 			data(0)
 		{}
+
+		TypedArg(
+			const char *name, const char *help, ArgRegistry *reg,
+			std::initializer_list<int> defaults
+		):
+			Arg(name, help, reg, false),
+			data(defaults.size() > 0 ? *defaults.begin() : 0)
+		{
+			if (defaults.size() > 1)
+			{
+				throw std::logic_error(
+					"Bool count " + std::string(name) + " should only have 1 initializer.");
+			}
+		}
+
+
 		TypedArg(TypedArg &&other):
 			Arg(std::move(static_cast<Arg&>(other))),
 			data(other.data)
@@ -342,6 +361,7 @@ namespace argparse
 	template<>
 	struct TypedArg<bool, 0>: public Arg
 	{
+		typedef bool rawtype;
 		bool data;
 
 		TypedArg(const char *name, const char *help, ArgRegistry *reg=nullptr):
