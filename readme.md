@@ -104,6 +104,14 @@ Otherwise, it is a required argument.  It can be empty to mark the arg
 as optional but without any explicit default values.  Otherwise, it
 should match the length of the argument.
 
+## Argument groups
+`auto mygroup = parser.group("groupname")`
+`mygroup.add<tp, num=1>(...)`
+Returns a group struct which can be used to add arguments under a group.
+Groups will group arguments together in the help message. The add method
+has the same signature is the Parser.  Adding with Parser adds to the
+default group.
+
 ## Parsing the argument list.
 `int parse(int argc, char *argv[] [, const char *program])`
 
