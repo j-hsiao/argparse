@@ -208,6 +208,12 @@ namespace argparse
 			ndefaults(other.ndefaults)
 		{}
 
+		TypedArg<T, count>& operator=(std::initializer_list<T> vals)
+		{
+			data = vals;
+			return *this;
+		}
+
 		//Where in standard says that this
 		//would cause something like
 		//TypedArg<T,3> x; x[0]
@@ -298,6 +304,12 @@ namespace argparse
 		T* operator->() { return &data; }
 		const T* operator->() const { return &data; }
 
+		TypedArg<T, 1>& operator=(const T &val)
+		{
+			data = val;
+			return *this;
+		}
+
 		operator T() { return data; }
 		virtual void flagspec(std::ostream &o) const
 		{ o << name << ' ' << name; }
@@ -340,11 +352,16 @@ namespace argparse
 			}
 		}
 
-
 		TypedArg(TypedArg &&other):
 			Arg(std::move(static_cast<Arg&>(other))),
 			data(other.data)
 		{}
+
+		TypedArg<bool, 1>& operator=(int val)
+		{
+			data = val;
+			return *this;
+		}
 
 		int& operator*() { return data; }
 		const int& operator*() const { return data; }
@@ -386,6 +403,12 @@ namespace argparse
 			Arg(std::move(static_cast<Arg&>(other))),
 			data(other.data)
 		{}
+
+		TypedArg<bool, 0>& operator=(bool val)
+		{
+			data = val;
+			return *this;
+		}
 
 		bool& operator*() { return data; }
 		const bool& operator*() const { return data; }
