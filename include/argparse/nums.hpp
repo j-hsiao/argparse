@@ -17,19 +17,19 @@ namespace argparse
 	inline bool borderval(unsigned long val) { return val == ULONG_MAX; }
 	inline bool borderval(unsigned long long val) { return val == ULLONG_MAX; }
 
-	void rawcvt(float &dst, const char *args, char **end, int base)
+	inline void rawcvt(float &dst, const char *args, char **end, int base)
 	{ dst = std::strtof(args, end); }
-	void rawcvt(double &dst, const char *args, char **end, int base)
+	inline void rawcvt(double &dst, const char *args, char **end, int base)
 	{ dst = std::strtod(args, end); }
-	void rawcvt(long double &dst, const char *args, char **end, int base)
+	inline void rawcvt(long double &dst, const char *args, char **end, int base)
 	{ dst =  std::strtold(args, end); }
-	void rawcvt(long &dst, const char *args, char **end, int base)
+	inline void rawcvt(long &dst, const char *args, char **end, int base)
 	{ dst = std::strtol(args, end, base); }
-	void rawcvt(long long &dst, const char *args, char **end, int base)
+	inline void rawcvt(long long &dst, const char *args, char **end, int base)
 	{ dst = std::strtoll(args, end, base); }
-	void rawcvt(unsigned long &dst, const char *args, char **end, int base)
+	inline void rawcvt(unsigned long &dst, const char *args, char **end, int base)
 	{ dst = std::strtoul(args, end, base); }
-	void rawcvt(unsigned long long &dst, const char *args, char **end, int base)
+	inline void rawcvt(unsigned long long &dst, const char *args, char **end, int base)
 	{ dst = std::strtoull(args, end, base); }
 
 	template<class T>
