@@ -117,47 +117,18 @@ has the same signature is the Parser.  Adding with Parser adds to the
 default group.
 
 ## Parsing the argument list.
-`int parse(int argc, char *argv[] [, const char *program])`
+`argparse::ParseResult parse(int argc, char *argv[] [, const char *program])`
 
 This parses the argument list.  If program is given, it is the name
 of the program to be used in the help messages.  Otherwise, `argv[0]`
-is assumed to be the name of the program.  Return `0` on success, `1` if
-a help flag was encountered, and `2` if there was a parse error.  When
-`1` or `2` is returned, the appropriate messages are printed to stderr.
+is assumed to be the name of the program.
 
-example:
+ParseResult has a `code` attribute which indicates parsing success.  It
+is 0 on success, 1 if parsing was interrupted by a help flag, and 2 if
+parsing failed due to an error.
 
-```
-#include <argparse/argparse.hpp>
-#include <iostream>
+ParseResult also has a `bool parsed(const char *name)` member function
+that returns whether an argument was parsed.  This is most useful for
+checking if optional arguments were given when all values are valid.
 
-int main(int argc, char *argv[])
-{
-  argparse::parser p("description", "-");
-  auto arg = p.add<const char*>(
-    "name of arg", "description of arg",
-    {"optional initializer list of default values"});
-  auto twonums = p.add<int, 2>("twonums", "2 positional integers");
-  auto variablenums = p.add<float, -1>(
-    "variablenums", "variable numbers", {1, 2, 3});
-
-  if (int result = p.parse(argc, argv))
-  {
-    if (result == 1) { return 0; }
-    else
-    {
-      std::cerr << "error parsing arguments." << std::endl;
-      return 1;
-    }
-  }
-
-  std::cerr << "the first arg was " << arg << std::endl;
-
-  std::cerr << "the 2 numbers were << twonums[0] << ", "
-    << twonums[1] << std::endl;
-
-  std::cerr << "Got " << variablenums.size() << " floats" << std::endl;
-}
-```
-
-
+See tests for examples.
