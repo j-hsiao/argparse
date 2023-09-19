@@ -49,6 +49,8 @@ namespace argparse
 		{}
 	};
 
+
+
 	template<class T, int N, bool=(N<0)>
 	struct Multiarg: public ArgCommon
 	{

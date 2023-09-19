@@ -8,6 +8,8 @@
 //          to check if the argument is a flag or is just this
 //          breakpoint flag.
 //
+// Iteration can be by argument or by shortflag.
+//
 #ifndef ARGPARSE_ARGITER_HPP
 #define ARGPARSE_ARGITER_HPP
 #include <cstddef>
@@ -23,6 +25,7 @@ namespace argparse
 		int argc, pos;
 		const char * const *argv;
 		const char *prefix;
+		const char *arg;
 		int forcepos;
 
 		ArgIter(int argc, const char * const argv[], const char *prefix="-"):
@@ -31,10 +34,12 @@ namespace argparse
 			pos(-1),
 			argv(argv),
 			prefix(prefix),
+			arg(nullptr),
 			forcepos(0)
 		{ step(); }
 
 		operator bool() const { return pos < argc; }
+
 		void reset()
 		{
 			pos = -1;
@@ -43,12 +48,37 @@ namespace argparse
 		}
 
 		bool breakpoint() const
-		{ return isflag && argv[pos][isflag] == '0' && !argv[pos][isflag+1]; }
+		{ return isflag == 2 && argv[pos][2] == '0' && !argv[pos][3]; }
+
+		//name of flag without prefix chars
+		const char* flag() const
+		{
+			if (isflag > 2)
+			{ return argv[pos] + 2; }
+			else if (isflag)
+			{ return argv[pos] + isflag; }
+			else
+			{ return nullptr; }
+		}
+
+		//Assume the current arg is a short flag.
+		//Step through the current short-flag position
+		//If the current arg is exhausted, then step
+		//to the next arg.
+		void stepflag()
+		{
+			if (arg[0] == prefix[0])
+			{ arg = flag() + 1; }
+			else
+			{ ++arg; }
+			if (!arg[0]) { step(); }
+		}
 
 		//step to the next arg.
 		void step()
 		{
 			++pos;
+			arg = argv[pos];
 			if (pos >= argc) { return; }
 			if (forcepos)
 			{
@@ -59,7 +89,7 @@ namespace argparse
 			isflag = std::strspn(argv[pos], prefix);
 			if (isflag == 2)
 			{
-				const char *remain = argv[pos] + isflag;
+				const char *remain = argv[pos] + 2;
 				if (remain[0])
 				{
 					char *end;
@@ -77,18 +107,12 @@ namespace argparse
 				}
 			}
 			else if (!argv[pos][isflag])
-			{ isflag = 0; }
+			{
+				//Allow '-' as an arg since it is the general arg to indicate
+				//pipe.
+				isflag = 0;
+			}
 		}
-
-		//name of flag without prefix chars
-		const char* flag() const
-		{
-			if (isflag) { return argv[pos] + isflag; }
-			else { return nullptr; }
-		}
-
-		//current argument
-		const char* arg() const { return argv[pos]; }
 	};
 }
 #endif //ARGPARSE_ARGITER_HPP
