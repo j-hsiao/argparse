@@ -1,33 +1,52 @@
 # Argparse
 C++ template argument parsing library.
-There are 2 types of arguments: flags and positionals.  Flags are
-given by first giving the argument name prefixed with the prefix char
-(usually `-`) and then the corresponding arguments.  Positional args
-are given by position.  Multivalue arguments expect the arguments to
-be consecutive and will be interrupted by flags.  Special flags are
-the empty flag and integer flags (`--` or `--N` where `N` is an int).
-These special flags indicate the next `N` arguments are to be treated
-as positional arguments.  In the case of the empty flag, all remaining
-arguments will be treated as positional arguments.  These can be useful
-for giving negative numbers as arguments, though an alternative is to
-prefix it with an escaped space.
+There are 2 types of arguments: flags and positionals.
 
-Flag arguments match the first exact match.  If there are no exact
-matches, then the longest unique prefix match is used.  If the longest
-match is not unique, then parsing is failed due to ambiguity.
+Flags are given by first giving the argument name prefixed with the
+prefix char (usually `-`) and then the corresponding arguments.  They
+can be short (single char and single prefix char) or long (full name and
+double prefix char).  The short form can have an optional space followed
+by corresponding values.  The longform must appear alone followed by any
+corresponding values.  Shortform flags can be merged into a single
+argument as long as they take no arguments (bool flags).  non-bool flags
+can be merged as well as long as they are last.  This means at most 1
+non-bool flag is allowed per flag argument.
 
-There is also an implicit `-help` argument.  `-help` also follows
-the above rules.  However, there is special handling for the case
-where 2 prefix chars are used.  In this case, the flags will
-preferentially match with help.  That is to say, `--h`, `--he`,
-`--hel`, `--help` will all match with -help always while the
-corresponding `-h`, `-he`, `-hel`, `-help` will match with any
-arguments first, and then `-help` only if no arguments were matched.
+example:
 
-When the `-help` flag is matched,  there are 2 possible messages.
-If the argument was incomplete (`-h`, `-he`, `-hel`), then a short
-help message will be given.  Otherwise (`-help`), the full help message
-will be given.
+flags: `-v|--verbose`, `-a|--auto`, `-n|--name` `<name>`, `-c|--color` `<color>`
+
+allowable arguments:
+
+`-va`: verbose and auto
+`-av`: auto and verbose
+`-n` `<name>`: specify a name
+`-n<name>`: specify a name
+`-avn` `<name>`: auto, verbose and with name
+`-avn<name>`: auto, verbose and with name (space is optional for short form)
+`-avc` `<color>`: auto, verbose and with color
+
+bad arguments:
+
+`-vca`: c is short form of color. color requires 1 arg, but c is not last.
+`-anc`: n is short form of name. name requires 1 arg, but n is not last.
+`--color<color>`: long form requires space
+
+Special flags are flags of the form `--` or `--N` where `N` is a
+nonnegative integer.  `--` means treat all remaining arguments as
+positional arguments.  `--N` means treat the next N arguments as
+positional arguments.  `--0` is a special case that interrupts
+multivalue positional arguments.
+
+Positional args are given by position.  Multivalue arguments expect the
+arguments to be consecutive, uninterrupted by normal flags.  Special
+flags besides `--0` are allowed though.
+
+Argument names must be unique and each argument is allowed at most 1
+full name (more than 1 char.)
+
+There is also an implicit `-h|--help` argument.  `-h` triggers a short
+help message.  `--help` triggers a long help message.
 
 In the help message, required arguments will be surrounded by `<>`
 and optional arguments will be surrounded by `[]`.  The argument
@@ -35,8 +54,8 @@ may have additional specifier to indicate the number of required
 commandline arguments.
 * `xN`: requires exactly N arguments
 * `...`: variable number of arguments.
-* `++`: a counting flag
-* `!!`: a toggling flag
+* `++`: a counting flag (count == 1, type bool)
+* `!!`: a toggling flag (count == 0, type bool)
 
 # Usage
 Instantiate an `argparse::Parser`, add arguments, and then parse.

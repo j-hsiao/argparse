@@ -31,6 +31,20 @@ int main(int argc, char *argv[])
 		assert(val == val);
 	}
 
+	{
+		argparse::Base<short, 10> val{3};
+		assert(val == 3);
+		val = 5.67;
+		assert(val != 3);
+		assert(val == 5);
+		assert(val.data == 5);
+		argparse::Base<double, 10> val2{3.1415};
+		assert(val != val2);
+		val2 = 5;
+		assert(val == val2);
+		assert(val < 10);
+	}
+
 
 	return 0;
 }

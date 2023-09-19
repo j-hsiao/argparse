@@ -1,4 +1,6 @@
 //Parsing numbers from char*
+//bool store(T &dst, const char *arg, int base=10)
+//
 #ifndef ARGPARSE_CONVERT_HPP
 #define ARGPARSE_CONVERT_HPP
 #include <cerrno>
@@ -48,7 +50,6 @@ namespace argparse
 		return !*end;
 	}
 
-
 #define SPECIALIZE(T, valcheck, prefix) \
 	template<> \
 	bool store<prefix T>(prefix T &dst, const char *arg, int base) \
@@ -67,6 +68,7 @@ namespace argparse
 	SPECIALIZE(int, v <= UINT_MAX, unsigned)
 #undef SPECIALIZE
 
+	//A base numbase number.
 	template<class T, int numbase>
 	struct Base
 	{
@@ -74,9 +76,9 @@ namespace argparse
 		T data;
 		operator T&() { return data; }
 		operator const T&() const { return data; }
-		Base operator=(const T &v) { data = v; return *this; }
-		bool operator==(T other) { return data = other; }
+		Base& operator=(const T &v) { data = v; return *this; }
 	};
+
 	template<class T, int base>
 	bool store(Base<T, base> &dst, const char *arg)
 	{ return store(dst.data, arg, base); }
