@@ -43,6 +43,10 @@ if (BUILD_TESTING)
 	add_executable(demo test/demo.cpp)
 	target_link_libraries(demo PUBLIC ${PROJECT_NAME})
 
+	add_executable(parse test/parse.cpp)
+	target_link_libraries(parse PUBLIC ${PROJECT_NAME})
+	add_test(NAME parse COMMAND parse)
+
 	add_executable(nums test/nums.cpp)
 	target_link_libraries(nums PUBLIC ${PROJECT_NAME})
 	add_test(NAME nums COMMAND nums)
