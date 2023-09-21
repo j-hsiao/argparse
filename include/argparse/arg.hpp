@@ -40,20 +40,19 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help, bool required
 		):
-			help(help)
+			help(help),
 			required(required)
 		{
 			//TODO: register with p using names
 		}
 
 		virtual bool parse(ArgIter &it) = 0;
-		virtual void shortspec(std::ostream &o) = 0;
-		virtual void longspec(std::ostream &o) = 0;
+		virtual void count(std::ostream &o) = 0;
 	};
 
 	//Fixed num of multiple arguments
 	template<class T, int N, bool=(N<0)>
-	struct Multiarg: public ArgCommon
+	struct MultiArg: public ArgCommon
 	{
 		std::array<T, N> data;
 
@@ -62,7 +61,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help
 		):
-			ArgCommon(p, name, help, true),
+			ArgCommon(p, names, help, true),
 			data{}
 		{}
 
@@ -71,7 +70,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help, std::initializer_list<V> defaults
 		):
-			ArgCommon(p, name, help, false),
+			ArgCommon(p, names, help, false),
 			data{}
 		{
 			if (defaults.size() != N)
@@ -84,17 +83,20 @@ namespace argparse
 			{ data[idx++] = item; }
 		}
 
-		virtual bool parse(ArgIter &it)
+		virtual bool parse(ArgIter &it) override
 		{
 			for (int i = 0; i < N; ++i)
-			{ if (!parse(data[i], it)) { return false; } }
+			{ if (!argparse::parse(data[i], it)) { return false; } }
 			return true;
 		}
+
+		virtual void count(std::ostream &o) override
+		{ o << " x" << N; }
 	};
 
 	//Variable arguments
 	template<class T, int N>
-	struct Multiarg<T, N, false>: public ArgCommon
+	struct MultiArg<T, N, false>: public ArgCommon
 	{
 		std::vector<T> data;
 
@@ -103,7 +105,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help
 		):
-			ArgCommon(p, name, help, true),
+			ArgCommon(p, names, help, true),
 			data{}
 		{}
 
@@ -112,17 +114,21 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help, std::initializer_list<V> defaults
 		):
-			ArgCommon(p, name, help, false),
+			ArgCommon(p, names, help, false),
 			data(defaults.begin(), defaults.end())
 		{}
 
-		virtual bool parse(ArgIter &it)
+		virtual bool parse(ArgIter &it) override
 		{
 			data.clear();
-			while (parse(data[i], it))
-			{}
+			T tmp;
+			while (argparse::parse(tmp, it))
+			{ data.push_back(tmp); }
 			return true;
 		}
+
+		virtual void count(std::ostream &o) override
+		{ o << " ..."; }
 	};
 
 	template<class T>
@@ -149,44 +155,121 @@ namespace argparse
 			{ data = item; }
 		}
 
-		virtual bool parse(ArgIter &it)
-		{ return parse(data, it); }
+		virtual bool parse(ArgIter &it) override
+		{ return argparse::parse(data, it); }
+
+		virtual void count(std::ostream &o) override {}
 	};
 
-
-	template<class T, int N=1>
-	struct Arg: public Multiarg<T, N>
+	struct ToggleBool: public ArgCommon
 	{
+		bool data;
+
+		template<class Parser>
+		ToggleBool(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help
+		):
+			ArgCommon(p, names, help, true),
+			data(false)
+		{}
+
+		template<class Parser, class V>
+		ToggleBool(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help, std::initializer_list<V> defaults
+		):
+			ArgCommon(p, names, help, false)
+		{
+			for (const auto &item : defaults)
+			{ data = item; }
+		}
+
+		virtual bool parse(ArgIter &it) override
+		{
+			data = !data;
+			return true;
+		}
+
+		virtual void count(std::ostream &o) override
+		{ o << "!!"; }
 	};
 
-	//single argument
-	template<class T>
-	struct Arg<T, 1>: public ArgCommon
+	struct CountBool: public ArgCommon
 	{
-		T data;
+		int data;
+
+		template<class Parser>
+		CountBool(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help
+		):
+			ArgCommon(p, names, help, true),
+			data(0)
+		{}
+
+		template<class Parser, class V>
+		CountBool(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help, std::initializer_list<V> defaults
+		):
+			ArgCommon(p, names, help, false)
+		{
+			for (const auto &item : defaults)
+			{ data = item; }
+		}
+
+		virtual bool parse(ArgIter &it) override
+		{
+			++data;
+			return true;
+		}
+
+		virtual void count(std::ostream &o) override
+		{ o << "++"; }
 	};
 
-	//toggle bool
-	template<>
-	struct Arg<bool, 0>
+	template<class T, int N>
+	struct Arg: public MultiArg<T, N>
 	{
+		template<class Parser>
+		Arg(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help
+		):
+			MultiArg<T, N>(p, names, help)
+		{}
+
+		template<class Parser, class V=T>
+		Arg(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help, std::initializer_list<V> defaults
+		):
+			MultiArg<T, N>(p, names, help, defaults)
+		{}
+
+		template<class Parser>
+		Arg(
+			Parser &p, const char *name,
+			const char *help
+		):
+			MultiArg<T, N>(p, {name}, help)
+		{}
+
+		template<class Parser, class V=T>
+		Arg(
+			Parser &p, const char *name,
+			const char *help, std::initializer_list<V> defaults
+		):
+			MultiArg<T, N>(p, {name}, help, defaults)
+		{}
+
+		T& operator[](std::size_t idx)
+		{ return this->data[idx]; }
+
+		const T& operator[](std::size_t idx) const
+		{ return this->data[idx]; }
 	};
-
-	//accumulating bool
-	template<>
-	struct Arg<bool, 1>
-	{
-	};
-
-
-
-
-
-
-
-
-
-
 
 
 //	struct Arg;
