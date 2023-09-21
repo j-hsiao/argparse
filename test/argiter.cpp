@@ -35,15 +35,15 @@ int main(int argc, char *argv[])
 		assert(!it.flag());
 		assert(it.pos == 4);
 		it.step();
-		assert(!std::strcmp(it.arg, "-h"));
+		assert(!std::strcmp(it.arg, "h"));
 		assert(!std::strcmp(it.flag(), "h"));
 		assert(it.pos == 5);
 		it.step();
-		assert(!std::strcmp(it.arg, "--verbose"));
+		assert(!std::strcmp(it.arg, "verbose"));
 		assert(!std::strcmp(it.flag(), "verbose"));
 		assert(it.pos == 6);
 		it.step();
-		assert(!std::strcmp(it.arg, "-2"));
+		assert(!std::strcmp(it.arg, "2"));
 		assert(!std::strcmp(it.flag(), "2"));
 		assert(it.pos == 7);
 		it.step();
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 		assert(!it.flag());
 		assert(it.pos == 10);
 		it.step();
-		assert(!std::strcmp(it.arg, "--flag3"));
+		assert(!std::strcmp(it.arg, "flag3"));
 		assert(!std::strcmp(it.flag(), "flag3"));
 		assert(it.pos == 11);
 	}
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 		assert(it);
 		assert(!std::strcmp(it.arg, "pos1"));
 		it.step();
-		assert(!std::strcmp(it.arg, "-czfasdf"));
+		assert(!std::strcmp(it.arg, "czfasdf"));
 		assert(it.isflag == 1);
 		assert(it.flag()[0] == 'c');
 		it.stepflag();

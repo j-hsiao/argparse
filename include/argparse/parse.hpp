@@ -8,7 +8,7 @@ namespace argparse
 	template<class T>
 	bool parse(T &out, ArgIter &it)
 	{
-		if (store(out, it.arg))
+		if (it.isarg() && store(out, it.arg))
 		{
 			it.step();
 			return true;
@@ -19,8 +19,12 @@ namespace argparse
 	template<>
 	inline bool parse<const char*>(const char * &out, ArgIter &it)
 	{
-		out = it.arg;
-		it.step();
-		return true;
+		if (it.isarg())
+		{
+			out = it.arg;
+			it.step();
+			return true;
+		}
+		return false;
 	}
 }

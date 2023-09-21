@@ -47,6 +47,14 @@ namespace argparse
 			step();
 		}
 
+		//whether current arg can be parsed.
+		bool isarg() const
+		{
+			return (
+				pos < argc
+				&& (!isflag || arg != flag()));
+		}
+
 		bool breakpoint() const
 		{ return isflag == 2 && argv[pos][2] == '0' && !argv[pos][3]; }
 
@@ -78,10 +86,10 @@ namespace argparse
 		void step()
 		{
 			++pos;
-			arg = argv[pos];
 			if (pos >= argc) { return; }
 			if (forcepos)
 			{
+				arg = argv[pos];
 				--forcepos;
 				isflag = 0;
 				return;
@@ -96,7 +104,13 @@ namespace argparse
 					forcepos = static_cast<int>(std::strtoll(remain, &end, 10));
 					//outof range gives acceptable values. (skip all remaining)
 					if (!end[0])
-					{ if (forcepos) { step(); } }
+					{
+						if (forcepos)
+						{
+							step();
+							return;
+						}
+					}
 					else
 					{ forcepos = 0; }
 				}
@@ -112,6 +126,10 @@ namespace argparse
 				//pipe.
 				isflag = 0;
 			}
+			if (isflag)
+			{ arg = flag(); }
+			else
+			{ arg = argv[pos]; }
 		}
 	};
 }

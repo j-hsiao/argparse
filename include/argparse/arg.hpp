@@ -13,15 +13,14 @@
 //
 // TypedArg is implemented for basic integral types and char*.
 //
-//
-//
 // Having defaults makes arg optional
 // (if not optional, what's the point of the defaults?)
 #ifndef ARGPARSE_ARG_HPP
 #define ARGPARSE_ARG_HPP
 
 #include "argparse/argiter.hpp"
-#include "argparse/nums.hpp"
+#include "argparse/parse.hpp"
+
 #include <array>
 #include <utility>
 #include <vector>
@@ -33,55 +32,128 @@ namespace argparse
 {
 	struct ArgCommon
 	{
-		const char * const name;
 		const char * const help;
 		bool required;
 
 		template<class Parser>
-		ArgCommon(Parser &p, const char *name, const char *help):
-			name(name),
+		ArgCommon(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help, bool required
+		):
 			help(help)
+			required(required)
 		{
-			//TODO: register with p
+			//TODO: register with p using names
 		}
 
-		virtual void parse(...)
-		{}
+		virtual bool parse(ArgIter &it) = 0;
+		virtual void shortspec(std::ostream &o) = 0;
+		virtual void longspec(std::ostream &o) = 0;
 	};
 
-
-
+	//Fixed num of multiple arguments
 	template<class T, int N, bool=(N<0)>
 	struct Multiarg: public ArgCommon
 	{
+		std::array<T, N> data;
+
 		template<class Parser>
-		MultiArg(Parser &p, const char *name, const char *help):
-			ArgCommon(p, name, help)
+		MultiArg(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help
+		):
+			ArgCommon(p, name, help, true),
+			data{}
 		{}
 
-		std::array<T, N> data;
-		void from_initializer(const std::initializer_list<T> &l)
+		template<class Parser, class V>
+		MultiArg(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help, std::initializer_list<V> defaults
+		):
+			ArgCommon(p, name, help, false),
+			data{}
 		{
-			i = 0;
-			for (auto &x : l) { arr[i++] = x; }
+			if (defaults.size() != N)
+			{
+				throw std::logic_error(
+					"Number of defaults does not match number of args.");
+			}
+			int idx = 0;
+			for (const auto &item : defaults)
+			{ data[idx++] = item; }
+		}
+
+		virtual bool parse(ArgIter &it)
+		{
+			for (int i = 0; i < N; ++i)
+			{ if (!parse(data[i], it)) { return false; } }
+			return true;
 		}
 	};
 
+	//Variable arguments
 	template<class T, int N>
 	struct Multiarg<T, N, false>: public ArgCommon
 	{
+		std::vector<T> data;
+
 		template<class Parser>
-		MultiArg(Parser &p, const char *name, const char *help):
-			ArgCommon(p, name, help)
+		MultiArg(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help
+		):
+			ArgCommon(p, name, help, true),
+			data{}
 		{}
 
-		std::vector<T> data;
-		void from_initializer(const std::initializer_list<T> &l)
-		{ data.assign(l.begin(), l.end()); }
+		template<class Parser, class V>
+		MultiArg(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help, std::initializer_list<V> defaults
+		):
+			ArgCommon(p, name, help, false),
+			data(defaults.begin(), defaults.end())
+		{}
+
+		virtual bool parse(ArgIter &it)
+		{
+			data.clear();
+			while (parse(data[i], it))
+			{}
+			return true;
+		}
+	};
+
+	template<class T>
+	struct SingleArg: public ArgCommon
+	{
+		T data;
+
+		template<class Parser>
+		SingleArg(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help
+		):
+			ArgCommon(p, names, help, true)
+		{}
+
+		template<class Parser, class V>
+		SingleArg(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help, std::initializer_list<V> defaults
+		):
+			ArgCommon(p, names, help, false)
+		{
+			for (const auto &item : defaults)
+			{ data = item; }
+		}
+
+		virtual bool parse(ArgIter &it)
+		{ return parse(data, it); }
 	};
 
 
-	//Fixed multiple arguments
 	template<class T, int N=1>
 	struct Arg: public Multiarg<T, N>
 	{

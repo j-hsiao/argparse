@@ -20,8 +20,8 @@ int main(int argc, char *argv[])
 	const char *c;
 
 	const char * args[] = {
-		"-f3.14", "-d1.23", "-i-1", "2", "-1", "3", "-2",
-		"-1234", "1234", "12345", "-ohello.txt"
+		"-f3.14", "-d1.23", "-i-1", "2", " -1", "3", " -2",
+		" -1234", "1234", "12345", "-ohello.txt"
 	};
 	argparse::ArgIter p(11, args, "-");
 	assert(p.isflag == 1);
@@ -71,8 +71,10 @@ int main(int argc, char *argv[])
 	assert(uLL == 12345);
 
 	assert(p.isflag == 1);
+	assert(!p.isarg());
 	assert(p.flag()[0] == 'o');
 	p.stepflag();
+	assert(p.isarg());
 	result = argparse::parse(c, p);
 	assert(result);
 	assert(!std::strcmp(c, "hello.txt"));
