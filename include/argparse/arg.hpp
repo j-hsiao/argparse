@@ -59,7 +59,7 @@ namespace argparse
 		template<class Parser>
 		FixedArgs(
 			Parser &p, std::initializer_list<const char*> names,
-			const char *help
+			const char *help=nullptr
 		):
 			ArgCommon(p, names, help, true),
 			data{}
@@ -99,7 +99,7 @@ namespace argparse
 		template<class Parser>
 		VarArgs(
 			Parser &p, std::initializer_list<const char*> names,
-			const char *help
+			const char *help=nullptr
 		):
 			ArgCommon(p, names, help, true),
 			data{}
@@ -136,7 +136,7 @@ namespace argparse
 		template<class Parser>
 		SingleArg(
 			Parser &p, std::initializer_list<const char*> names,
-			const char *help
+			const char *help=nullptr
 		):
 			ArgCommon(p, names, help, true)
 		{}
@@ -164,7 +164,7 @@ namespace argparse
 		template<class Parser>
 		ToggleBool(
 			Parser &p, std::initializer_list<const char*> names,
-			const char *help
+			const char *help=nullptr
 		):
 			ArgCommon(p, names, help, true),
 			data(false)
@@ -197,7 +197,7 @@ namespace argparse
 		template<class Parser>
 		CountBool(
 			Parser &p, std::initializer_list<const char*> names,
-			const char *help
+			const char *help=nullptr
 		):
 			ArgCommon(p, names, help, true),
 			data(0)
@@ -222,65 +222,74 @@ namespace argparse
 		{ o << "++"; }
 	};
 
-	template<class T, int N, bool fixed=(N>0)>
-	struct Impl
-	{ typedef FixedArgs<T, N> impl; };
-
 	template<class T, int N>
-	struct Impl<T, N, false>
+	struct Impl
 	{ typedef VarArgs<T> impl; };
 
 	template<class T>
-	struct Impl<T, 1, true>
+	struct Impl<T, 1>
 	{ typedef SingleArg<T> impl; };
 
 	template<>
-	struct Impl<bool, 1, true>
+	struct Impl<bool, 1>
 	{ typedef CountBool impl; };
 
 	template<>
-	struct Impl<bool, 0, false>
+	struct Impl<bool, 0>
 	{ typedef ToggleBool impl; };
 
-	template<class T, int N>
-	struct BasicArg: public typename Impl<T, N>::impl
+	template<class T, int N, bool fixed=(N>1)>
+	struct BasicArg: public Impl<T, N>::impl
 	{
-		typedef decltype(impl::data) data_type;
 		typedef typename Impl<T, N>::impl impl_type;
 
 		using impl_type::impl_type;
 
 		template<class Parser>
 		BasicArg(
-			Parser &p, std::initializer_list<const char*> names,
+			Parser &p, const char *name,
 			const char *help=nullptr
 		):
-			impl(p, names, help)
-		{}
-
-		template<class Parser>
-		BasicArg(
-			Parser &p, std::initializer_list<const char*> names,
-			const char *help, const typename impl::defaults_type &defaults
-		):
-			impl(p, names, help, defaults)
+			impl_type(p, {name}, help)
 		{}
 
 		template<class Parser>
 		BasicArg(
 			Parser &p, const char *name,
-			const char *help
+			const char *help, const typename impl_type::defaults_type &defaults
 		):
-			impl(p, {name}, help)
+			impl_type(p, {name}, help, defaults)
 		{}
+	};
+
+	template<class T, int N>
+	struct BasicArg<T, N, true>: public FixedArgs<T, N>
+	{
+		using FixedArgs<T, N>::FixedArgs;
 
 		template<class Parser>
 		BasicArg(
 			Parser &p, const char *name,
-			const char *help, const typename impl::defaults_type &defaults
+			const char *help=nullptr
 		):
-			impl(p, {name}, help, defaults)
+			FixedArgs<T, N>(p, {name}, help)
 		{}
+
+		template<class Parser, int M>
+		BasicArg(
+			Parser &p, const char *name,
+			const char *help, const T (&defaults)[M]
+		):
+			FixedArgs<T, N>(p, {name}, help, defaults)
+		{}
+	};
+
+	template<class impl>
+	struct Wrapper: public impl
+	{
+		typedef decltype(impl::data) data_type;
+
+		using impl::impl;
 
 		data_type& operator*() { return this->data; }
 		const data_type& operator*() const { return this->data; }
@@ -289,10 +298,11 @@ namespace argparse
 		const data_type* operator->() const { return &this->data; }
 	};
 
-	template<class T, int N=1>
-	struct Arg: public BasicArg<MultiArg<T, N>>
+	template<class T, int N=1, bool multi=(N<0||N>1)>
+	struct Arg: public Wrapper<BasicArg<T, N>>
 	{
-		using BasicArg<MultiArg<T, N>>::BasicArg;
+		typedef Wrapper<BasicArg<T, N>> par;
+		using par::par;
 
 		T& operator[](std::size_t idx)
 		{ return this->data[idx]; }
@@ -301,17 +311,14 @@ namespace argparse
 		{ return this->data[idx]; }
 	};
 
-	template<class T>
-	struct Arg<T, 1>: public BasicArg<SingleArg<T>>
-	{ using BasicArg<SingleArg<T>>::BasicArg; };
+	template<class T, int N>
+	struct Arg<T, N, false>: public Wrapper<BasicArg<T, N>>
+	{
+		typedef Wrapper<BasicArg<T, N>> par;
+		using par::par;
+	};
 
-	template<>
-	struct Arg<bool, 1>: public BasicArg<CountBool>
-	{ using BasicArg<CountBool>::BasicArg; };
 
-	template<>
-	struct Arg<bool, 0>: public BasicArg<ToggleBool>
-	{ using BasicArg<ToggleBool>::BasicArg; };
 
 
 
