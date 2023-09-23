@@ -47,6 +47,10 @@ if (BUILD_TESTING)
 	target_link_libraries(parse PUBLIC ${PROJECT_NAME})
 	add_test(NAME parse COMMAND parse)
 
+	add_executable(printable test/printable.cpp)
+	target_link_libraries(printable PUBLIC ${PROJECT_NAME})
+	add_test(NAME printable COMMAND printable)
+
 	add_executable(nums test/nums.cpp)
 	target_link_libraries(nums PUBLIC ${PROJECT_NAME})
 	add_test(NAME nums COMMAND nums)

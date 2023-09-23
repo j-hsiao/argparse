@@ -19,11 +19,11 @@ namespace argparse
 	bool parse(Point &dst, ArgIter &it)
 	{ return parse(dst.x, it) && parse(dst.y, it); }
 }
-std::ostream& operator<<(std::ostream &o, const Point &p)
-{
-	o << '<' << p.x << ',' << p.y << '>';
-	return o;
-}
+//std::ostream& operator<<(std::ostream &o, const Point &p)
+//{
+//	o << '<' << p.x << ',' << p.y << '>';
+//	return o;
+//}
 
 struct DummyParser
 {
@@ -55,6 +55,8 @@ int main(int argc, char *argv[])
 		expect[1] = 9;
 		expect[2] = 8;
 		assert(expect == *mynums);
+		mynums.print_defaults(std::cout);
+		std::cout << std::endl;
 	}
 	it.reset();
 	{
@@ -73,6 +75,8 @@ int main(int argc, char *argv[])
 		assert(mypoints[1].y == 4);
 		std::vector<Point> expect = {{6, 9}, {8, 4}};
 		assert(*mypoints == expect);
+		mypoints.print_defaults(std::cout);
+		std::cout << std::endl;
 	}
 	it.reset();
 	{
@@ -87,11 +91,32 @@ int main(int argc, char *argv[])
 		assert(mypoint->x == 8);
 		assert(mypoint->y == 4);
 		assert(*mypoint == *mypoint);
+		mypoint.print_defaults(std::cout);
+		std::cout << std::endl;
 	}
 	{
 		argparse::Arg<bool> countbool(dummy, "count", nullptr);
+		assert(*countbool == 0);
+		countbool.parse(it);
+		assert(*countbool == 1);
+		countbool.parse(it);
+		assert(*countbool == 2);
+		countbool.parse(it);
+		assert(*countbool == 3);
+		countbool.print_defaults(std::cout);
+		std::cout << std::endl;
 	}
-
-
+	{
+		argparse::Arg<bool, 0> tbool(dummy, "count", nullptr);
+		assert(!*tbool);
+		tbool.parse(it);
+		assert(*tbool);
+		tbool.parse(it);
+		assert(!*tbool);
+		tbool.parse(it);
+		assert(*tbool);
+		tbool.print_defaults(std::cout);
+		std::cout << std::endl;
+	}
 	return 0;
 }
