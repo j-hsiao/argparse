@@ -345,5 +345,11 @@ namespace argparse
 			o << this->data;
 		}
 	};
+
+	template<class T, int N>
+	struct Flag: public Arg<T, N>
+	{ using Arg<T, N>::Arg; };
+
+
 }
 #endif //ARGPARSE_ARG_HPP
