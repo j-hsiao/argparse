@@ -28,8 +28,8 @@ namespace argparse
 struct DummyParser
 {
 	bool wasflag;
-	void add(argparse::ArgCommon*, std::initializer_list<const char*>){ wasflag = 0; };
-	void add(argparse::FlagCommon*, std::initializer_list<const char*>){ wasflag = 1; };
+	void add(argparse::ArgCommon&){ wasflag = 0; };
+	void add(argparse::FlagCommon&){ wasflag = 1; };
 };
 
 int main(int argc, char *argv[])

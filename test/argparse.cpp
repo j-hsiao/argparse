@@ -1,13 +1,28 @@
+#undef NDEBUG
+
 #include "argparse/argparse.hpp"
 #include "argparse/argiter.hpp"
 #include "argstruct.hpp"
-#undef NDEBUG
 #include <cassert>
+#include <iostream>
 #include <string>
 
 int main(int argc, char *argv[])
 {
 	argparse::Parser p("Test program", "-");
+	using namespace argparse;
+	Arg<int> num(p, "num", "A number, required");
+	assert(num.required);
+
+	Group grp1(p, "geometry");
+	Flag<float, 3> vec(grp1, {"vec", "v"}, "Vector x y z", {});
+	Flag<float, 3> point(grp1, {"point", "p"}, "Point x y z", {1, 2, 3});
+	Flag<bool, 0> invert(grp1, "i", "Invert axes.");
+	assert(!vec.required);
+	assert(!invert.required);
+	assert(!invert);
+
+
 
 
 //	{

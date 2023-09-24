@@ -38,13 +38,17 @@ namespace argparse
 		const char * const help;
 		bool required;
 
+		ArgCommon() = delete;
+		ArgCommon(const ArgCommon&) = delete;
+		ArgCommon(ArgCommon&&) = delete;
+
 		template<class Parser>
 		ArgCommon(
 			Parser *p, std::initializer_list<const char*> names,
 			const char *help, bool required
 		):
 			ArgCommon(names, help, required)
-		{ if (p) { p->add(this, names); } }
+		{ if (p) { p->add(*this); } }
 
 		ArgCommon(
 			std::initializer_list<const char*> names,
@@ -70,7 +74,7 @@ namespace argparse
 			const char *help, bool required
 		):
 			ArgCommon(names, help, required)
-		{ if (p) { p->add(this, names); } }
+		{ if (p) { p->add(*this); } }
 	};
 
 	//Fixed num of multiple arguments
@@ -97,9 +101,24 @@ namespace argparse
 			data{}
 		{
 			static_assert(N == M, "Fixed multi-arg count does not match number of defaults.");
-			for (int idx=0; idx<N; ++idx)
-			{ data[idx] = defaults[idx]; }
+			if (M)
+			{
+				for (int idx=0; idx<N; ++idx)
+				{ data[idx] = defaults[idx]; }
+			}
 		}
+
+		struct Dummy {};
+
+		template<class Parser>
+		FixedArgs(
+			Parser &p, std::initializer_list<const char*> names,
+			const char *help, Dummy d
+		):
+			Base(&p, names, help, false),
+			data{}
+		{}
+
 
 		virtual bool parse(ArgIter &it) override
 		{
@@ -190,7 +209,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help=nullptr
 		):
-			Base(&p, names, help, true),
+			Base(&p, names, help, false),
 			data(false)
 		{}
 
@@ -211,6 +230,8 @@ namespace argparse
 
 		virtual void print_count(std::ostream &o) const override
 		{ o << "!!"; }
+
+		operator bool() const { return data; }
 	};
 
 	template<class Base>
@@ -224,7 +245,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help=nullptr
 		):
-			Base(&p, names, help, true),
+			Base(&p, names, help, false),
 			data(0)
 		{}
 
@@ -245,6 +266,8 @@ namespace argparse
 
 		virtual void print_count(std::ostream &o) const override
 		{ o << "++"; }
+
+		operator int() const { return data; }
 	};
 
 	template<class T, int N, class Base>

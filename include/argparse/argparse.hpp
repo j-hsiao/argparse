@@ -3,8 +3,8 @@
 #include "argparse/arg.hpp"
 #include "argparse/argiter.hpp"
 
+#include <cassert>
 #include <cstring>
-#include <initializer_list>
 #include <iostream>
 #include <map>
 #include <set>
@@ -24,11 +24,35 @@ namespace argparse
 	template<class Parser>
 	struct Group
 	{
-		Parser *parent;
+		Parser &parent;
+		const char *name;
+		std::set<ArgCommon*> members;
 
+		Group(Parser &parent, const char *name):
+			parent(parent),
+			name(name),
+			members{}
+		{
+			if (this != &parent)
+			{ parent.groups.push_back(this); }
+		}
+
+		void add(ArgCommon &arg)
+		{
+			parent.add(arg);
+			auto result = members.insert(&arg);
+			assert(result.second);
+		}
+
+		void add(FlagCommon &arg)
+		{
+			parent.add(arg);
+			auto result = members.insert(&arg);
+			assert(result.second);
+		}
 	};
 
-	struct Parser
+	struct Parser: public Group<Parser>
 	{
 		struct Cmp
 		{
@@ -45,45 +69,34 @@ namespace argparse
 		};
 
 		std::vector<ArgCommon*> pos;
-		std::map<const char*, ArgCommon*, cmp> flags;
+		std::vector<Group*> groups;
+		std::map<const char*, FlagCommon*, Cmp> flags;
 		const char *description;
 		const char *prefix;
 		std::ostream &out;
 
 		Parser(const char *description, const char *prefix, std::ostream &out=std::cerr):
+			Group(*this, nullptr),
 			description(description),
-			prefix(prefix)
+			prefix(prefix),
+			out(out)
 		{}
 
-		template<class T, int N>
-		void register(Arg<T, N> *arg, std::initializer_list<const char*> names)
+		void add(ArgCommon &arg)
 		{
-			if (names.size() != 1)
+			if (arg.names.size() > 1)
 			{ throw std::logic_error("Positional arg should have only 1 name."); }
-			const char *name = *names.begin();
-			for (const auto &a : pos)
-			{
-				if (!std::strcmp(a.name, name))
-				{ throw std::logic_error("Positional arg repeated name."); }
-			}
-			pos.push_back({{names}, &arg});
+			pos.push_back(&arg);
 		}
 
-		template<class T, int N>
-		void register(Flag<T, N> *arg, std::initializer_list<const char*> names)
+		void add(FlagCommon &arg)
 		{
-			obj = 
-			for (const char *name: names)
+			for (const char *name : arg.names)
 			{
-				if (!name || !name[0])
-				{ throw std::logic_error("Flag name should not be empty."); }
-				if (name[1])
-				{ lflags.insert({name, &arg}); }
-				else
-				{ sflags.insert({name, &arg}); }
+				auto result = flags.insert({name, &arg});
+				assert(result.second);
 			}
 		}
-
 	};
 
 
