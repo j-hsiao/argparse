@@ -34,28 +34,48 @@ namespace argparse
 {
 	struct ArgCommon
 	{
+		std::vector<const char*> names;
 		const char * const help;
 		bool required;
 
 		template<class Parser>
 		ArgCommon(
-			Parser &p, std::initializer_list<const char*> names,
+			Parser *p, std::initializer_list<const char*> names,
 			const char *help, bool required
 		):
+			ArgCommon(names, help, required)
+		{ if (p) { p->add(this, names); } }
+
+		ArgCommon(
+			std::initializer_list<const char*> names,
+			const char *help, bool required
+		):
+			names(names),
 			help(help),
 			required(required)
-		{
-			//TODO: register with p using names
-		}
+		{}
 
 		virtual bool parse(ArgIter &it) = 0;
 		virtual void print_count(std::ostream &o) const = 0;
 		virtual void print_defaults(std::ostream &o) const = 0;
 	};
 
+	struct FlagCommon: public ArgCommon
+	{
+		using ArgCommon::ArgCommon;
+
+		template<class Parser>
+		FlagCommon(
+			Parser *p, std::initializer_list<const char*> names,
+			const char *help, bool required
+		):
+			ArgCommon(names, help, required)
+		{ if (p) { p->add(this, names); } }
+	};
+
 	//Fixed num of multiple arguments
-	template<class T, int N>
-	struct FixedArgs: public ArgCommon
+	template<class T, int N, class Base>
+	struct FixedArgs: public Base
 	{
 		std::array<T, N> data;
 
@@ -64,7 +84,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help=nullptr
 		):
-			ArgCommon(p, names, help, true),
+			Base(&p, names, help, true),
 			data{}
 		{}
 
@@ -73,7 +93,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help, const T (&defaults)[M]
 		):
-			ArgCommon(p, names, help, false),
+			Base(&p, names, help, false),
 			data{}
 		{
 			static_assert(N == M, "Fixed multi-arg count does not match number of defaults.");
@@ -93,8 +113,8 @@ namespace argparse
 	};
 
 	//Variable arguments
-	template<class T>
-	struct VarArgs: public ArgCommon
+	template<class T, class Base>
+	struct VarArgs: public Base
 	{
 		typedef std::vector<T> defaults_type;
 		std::vector<T> data;
@@ -104,7 +124,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help=nullptr
 		):
-			ArgCommon(p, names, help, true),
+			Base(&p, names, help, true),
 			data{}
 		{}
 
@@ -113,7 +133,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help, const defaults_type &defaults
 		):
-			ArgCommon(p, names, help, false),
+			Base(&p, names, help, false),
 			data(defaults.begin(), defaults.end())
 		{}
 
@@ -130,8 +150,8 @@ namespace argparse
 		{ o << " ..."; }
 	};
 
-	template<class T>
-	struct SingleArg: public ArgCommon
+	template<class T, class Base>
+	struct SingleArg: public Base
 	{
 		typedef T defaults_type;
 		T data;
@@ -141,7 +161,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help=nullptr
 		):
-			ArgCommon(p, names, help, true)
+			Base(&p, names, help, true)
 		{}
 
 		template<class Parser>
@@ -149,7 +169,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help, const T &defaults
 		):
-			ArgCommon(p, names, help, false),
+			Base(&p, names, help, false),
 			data(defaults)
 		{}
 
@@ -159,7 +179,8 @@ namespace argparse
 		virtual void print_count(std::ostream &o) const override { o << " x1"; }
 	};
 
-	struct ToggleBool: public ArgCommon
+	template<class Base>
+	struct ToggleBool: public Base
 	{
 		typedef bool defaults_type;
 		bool data;
@@ -169,7 +190,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help=nullptr
 		):
-			ArgCommon(p, names, help, true),
+			Base(&p, names, help, true),
 			data(false)
 		{}
 
@@ -178,7 +199,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help, const defaults_type &defaults
 		):
-			ArgCommon(p, names, help, false),
+			Base(&p, names, help, false),
 			data(defaults)
 		{}
 
@@ -192,7 +213,8 @@ namespace argparse
 		{ o << "!!"; }
 	};
 
-	struct CountBool: public ArgCommon
+	template<class Base>
+	struct CountBool: public Base
 	{
 		typedef int defaults_type;
 		int data;
@@ -202,7 +224,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help=nullptr
 		):
-			ArgCommon(p, names, help, true),
+			Base(&p, names, help, true),
 			data(0)
 		{}
 
@@ -211,7 +233,7 @@ namespace argparse
 			Parser &p, std::initializer_list<const char*> names,
 			const char *help, const defaults_type &defaults
 		):
-			ArgCommon(p, names, help, false),
+			Base(&p, names, help, false),
 			data(defaults)
 		{}
 
@@ -225,26 +247,26 @@ namespace argparse
 		{ o << "++"; }
 	};
 
-	template<class T, int N>
+	template<class T, int N, class Base>
 	struct Impl
-	{ typedef VarArgs<T> impl; };
+	{ typedef VarArgs<T, Base> impl; };
 
-	template<class T>
-	struct Impl<T, 1>
-	{ typedef SingleArg<T> impl; };
+	template<class T, class Base>
+	struct Impl<T, 1, Base>
+	{ typedef SingleArg<T, Base> impl; };
 
-	template<>
-	struct Impl<bool, 1>
-	{ typedef CountBool impl; };
+	template<class Base>
+	struct Impl<bool, 1, Base>
+	{ typedef CountBool<Base> impl; };
 
-	template<>
-	struct Impl<bool, 0>
-	{ typedef ToggleBool impl; };
+	template<class Base>
+	struct Impl<bool, 0, Base>
+	{ typedef ToggleBool<Base> impl; };
 
-	template<class T, int N, bool fixed=(N>1)>
-	struct BasicArg: public Impl<T, N>::impl
+	template<class T, int N, class Base, bool fixed=(N>1)>
+	struct BasicArg: public Impl<T, N, Base>::impl
 	{
-		typedef typename Impl<T, N>::impl impl_type;
+		typedef typename Impl<T, N, Base>::impl impl_type;
 
 		using impl_type::impl_type;
 
@@ -265,17 +287,17 @@ namespace argparse
 		{}
 	};
 
-	template<class T, int N>
-	struct BasicArg<T, N, true>: public FixedArgs<T, N>
+	template<class T, int N, class Base>
+	struct BasicArg<T, N, Base, true>: public FixedArgs<T, N, Base>
 	{
-		using FixedArgs<T, N>::FixedArgs;
+		using FixedArgs<T, N, Base>::FixedArgs;
 
 		template<class Parser>
 		BasicArg(
 			Parser &p, const char *name,
 			const char *help=nullptr
 		):
-			FixedArgs<T, N>(p, {name}, help)
+			FixedArgs<T, N, Base>(p, {name}, help)
 		{}
 
 		template<class Parser, int M>
@@ -283,7 +305,7 @@ namespace argparse
 			Parser &p, const char *name,
 			const char *help, const T (&defaults)[M]
 		):
-			FixedArgs<T, N>(p, {name}, help, defaults)
+			FixedArgs<T, N, Base>(p, {name}, help, defaults)
 		{}
 	};
 
@@ -304,10 +326,10 @@ namespace argparse
 	template<class T, class V>
 	void operator<<(T&&, V&&);
 
-	template<class T, int N=1, bool multi=(N<0||N>1)>
-	struct Arg: public Wrapper<BasicArg<T, N>>
+	template<class T, int N=1, class Base=ArgCommon, bool multi=(N<0||N>1)>
+	struct Arg: public Wrapper<BasicArg<T, N, Base>>
 	{
-		typedef Wrapper<BasicArg<T, N>> par;
+		typedef Wrapper<BasicArg<T, N, Base>> par;
 		using par::par;
 
 		T& operator[](std::size_t idx)
@@ -333,10 +355,10 @@ namespace argparse
 		}
 	};
 
-	template<class T, int N>
-	struct Arg<T, N, false>: public Wrapper<BasicArg<T, N>>
+	template<class T, int N, class Base>
+	struct Arg<T, N, Base, false>: public Wrapper<BasicArg<T, N, Base>>
 	{
-		typedef Wrapper<BasicArg<T, N>> par;
+		typedef Wrapper<BasicArg<T, N, Base>> par;
 		using par::par;
 
 		virtual void print_defaults(std::ostream &o) const override
@@ -346,10 +368,9 @@ namespace argparse
 		}
 	};
 
-	template<class T, int N>
-	struct Flag: public Arg<T, N>
-	{ using Arg<T, N>::Arg; };
-
+	template<class T, int N=1, class Base=FlagCommon>
+	struct Flag: public Arg<T, N, Base>
+	{ using Arg<T, N, Base>::Arg; };
 
 }
 #endif //ARGPARSE_ARG_HPP

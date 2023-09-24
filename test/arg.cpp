@@ -27,7 +27,9 @@ namespace argparse
 
 struct DummyParser
 {
-	//TODO dummy interface
+	bool wasflag;
+	void add(argparse::ArgCommon*, std::initializer_list<const char*>){ wasflag = 0; };
+	void add(argparse::FlagCommon*, std::initializer_list<const char*>){ wasflag = 1; };
 };
 
 int main(int argc, char *argv[])
@@ -40,6 +42,7 @@ int main(int argc, char *argv[])
 
 	{
 		argparse::Arg<short, 3> mynums(dummy, "nums", "3 ints", {1,2,3});
+		assert(!dummy.wasflag);
 		assert(!mynums.required);
 		assert(mynums[0] == 1);
 		assert(mynums[1] == 2);
@@ -62,6 +65,7 @@ int main(int argc, char *argv[])
 	{
 		std::initializer_list<Point> fk{{1,2}, {3,4}};
 		argparse::Arg<Point, -1> mypoints(dummy, "points", "2 points", {{1,2}, {3,4}});
+		assert(!dummy.wasflag);
 		assert(mypoints[0].x == 1);
 		assert(mypoints[0].y == 2);
 		assert(mypoints[1].x == 3);
@@ -81,6 +85,7 @@ int main(int argc, char *argv[])
 	it.reset();
 	{
 		argparse::Arg<Point> mypoint(dummy, "point", "x y");
+		assert(!dummy.wasflag);
 		mypoint.parse(it);
 		assert(!std::strcmp(it.arg, "8"));
 		assert(mypoint->x == 6);
@@ -95,7 +100,8 @@ int main(int argc, char *argv[])
 		std::cout << std::endl;
 	}
 	{
-		argparse::Arg<bool> countbool(dummy, "count", nullptr);
+		argparse::Flag<bool> countbool(dummy, "count", nullptr);
+		assert(dummy.wasflag);
 		assert(*countbool == 0);
 		countbool.parse(it);
 		assert(*countbool == 1);
@@ -107,7 +113,8 @@ int main(int argc, char *argv[])
 		std::cout << std::endl;
 	}
 	{
-		argparse::Arg<bool, 0> tbool(dummy, "count", nullptr);
+		argparse::Flag<bool, 0> tbool(dummy, "count", nullptr);
+		assert(dummy.wasflag);
 		assert(!*tbool);
 		tbool.parse(it);
 		assert(*tbool);
