@@ -10,6 +10,22 @@
 //
 // Iteration can be by argument or by shortflag.
 //
+// summary:
+//   Struct ArgIter
+//   {
+//     attrs:
+//       arg
+//       isflag
+//     methods:
+//       operator bool() const;
+//       reset()
+//       isarg()
+//       breakpoint()
+//       flag()
+//       stepflag()
+//       step()
+//   };
+//
 #ifndef ARGPARSE_ARGITER_HPP
 #define ARGPARSE_ARGITER_HPP
 #include <cstddef>
@@ -22,11 +38,18 @@ namespace argparse
 	{
 		//> 0 if isflag else not a flag (doesn't start with prefix)
 		std::size_t isflag;
-		int argc, pos;
-		const char * const *argv;
-		const char *prefix;
 		const char *arg;
-		int forcepos;
+		private:
+			int argc, pos;
+			const char * const *argv;
+			const char *prefix;
+			int forcepos;
+		public:
+
+		template<class T, int N>
+		ArgIter(T (&args)[N], const char *prefix="-"):
+			ArgIter(N, args, prefix)
+		{}
 
 		ArgIter(int argc, const char * const argv[], const char *prefix="-"):
 			isflag(0),
@@ -61,10 +84,10 @@ namespace argparse
 		//name of flag without prefix chars
 		const char* flag() const
 		{
-			if (isflag > 2)
+			if (isflag >= 2)
 			{ return argv[pos] + 2; }
 			else if (isflag)
-			{ return argv[pos] + isflag; }
+			{ return argv[pos] + 1; }
 			else
 			{ return nullptr; }
 		}

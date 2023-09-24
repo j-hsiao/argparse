@@ -12,52 +12,53 @@
 int main(int argc, char *argv[])
 {
 	{
-		auto myargs = args(
-			"hello", "world", "--1", "--69", "whatever", "-h", "--verbose",
-			"-2", "--2", "-flag1", "--flag2", "--flag3"
-		);
+		const char* args[] = {
+			"hello", "world", "--1", "--69", "whatever",
+			"-h", "--verbose", "-2", "--2", "-flag1",
+			"--flag2", "--flag3"
+		};
 
-		argparse::ArgIter it(myargs.size(), myargs.args, "-");
+		argparse::ArgIter it(args, "-");
 		assert(it);
 		assert(!std::strcmp(it.arg, "hello"));
 		assert(!it.flag());
-		assert(it.pos == 0);
+		assert(it.arg == args[0]);
 		it.step();
 		assert(!std::strcmp(it.arg, "world"));
 		assert(!it.flag());
-		assert(it.pos == 1);
+		assert(it.arg == args[1]);
 		it.step();
 		assert(!std::strcmp(it.arg, "--69"));
-		assert(it.pos == 3);
+		assert(it.arg == args[3]);
 		assert(!it.flag());
 		it.step();
 		assert(!std::strcmp(it.arg, "whatever"));
 		assert(!it.flag());
-		assert(it.pos == 4);
+		assert(it.arg == args[4]);
 		it.step();
 		assert(!std::strcmp(it.arg, "h"));
 		assert(!std::strcmp(it.flag(), "h"));
-		assert(it.pos == 5);
+		assert(it.arg == args[5]+1);
 		it.step();
 		assert(!std::strcmp(it.arg, "verbose"));
 		assert(!std::strcmp(it.flag(), "verbose"));
-		assert(it.pos == 6);
+		assert(it.arg == args[6]+2);
 		it.step();
 		assert(!std::strcmp(it.arg, "2"));
 		assert(!std::strcmp(it.flag(), "2"));
-		assert(it.pos == 7);
+		assert(it.arg == args[7]+1);
 		it.step();
 		assert(!std::strcmp(it.arg, "-flag1"));
 		assert(!it.flag());
-		assert(it.pos == 9);
+		assert(it.arg == args[9]);
 		it.step();
 		assert(!std::strcmp(it.arg, "--flag2"));
 		assert(!it.flag());
-		assert(it.pos == 10);
+		assert(it.arg == args[10]);
 		it.step();
 		assert(!std::strcmp(it.arg, "flag3"));
 		assert(!std::strcmp(it.flag(), "flag3"));
-		assert(it.pos == 11);
+		assert(it.arg == args[11]+2);
 	}
 
 	{

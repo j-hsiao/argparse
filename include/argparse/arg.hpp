@@ -23,12 +23,12 @@
 #include "argparse/printable.hpp"
 
 #include <array>
-#include <utility>
-#include <vector>
+#include <ostream>
 #include <stdexcept>
 #include <string>
-#include <ostream>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace argparse
 {
@@ -48,7 +48,16 @@ namespace argparse
 			const char *help, bool required
 		):
 			ArgCommon(names, help, required)
-		{ if (p) { p->add(*this); } }
+		{
+			if (!this->names.size())
+			{ throw std::logic_error("Argument requires at least 1 name."); }
+			for (const char *name : names)
+			{
+				if (!name)
+				{ throw std::logic_error("Arg name should not be null."); }
+			}
+			if (p) { p->add(*this); }
+		}
 
 		ArgCommon(
 			std::initializer_list<const char*> names,

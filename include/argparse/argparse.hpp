@@ -3,7 +3,6 @@
 #include "argparse/arg.hpp"
 #include "argparse/argiter.hpp"
 
-#include <cassert>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -40,15 +39,15 @@ namespace argparse
 		void add(ArgCommon &arg)
 		{
 			parent.add(arg);
-			auto result = members.insert(&arg);
-			assert(result.second);
+			if (!members.insert(&arg).second)
+			{ throw std::logic_error("Arg already added"); }
 		}
 
 		void add(FlagCommon &arg)
 		{
 			parent.add(arg);
-			auto result = members.insert(&arg);
-			assert(result.second);
+			if (!members.insert(&arg).second)
+			{ throw std::logic_error("Flag already added"); }
 		}
 	};
 
@@ -63,9 +62,12 @@ namespace argparse
 		struct ParseResult
 		{
 			int code;
-			std::set<const char*, Cmp> flags;
-			int pos;
-			Parser *parent;
+			std::set<const ArgCommon*> args;
+			const Parser *parent;
+			operator bool() const { return code; }
+
+			bool parsed(const ArgCommon &arg)
+			{ return args.find(&arg) != args.end(); }
 		};
 
 		std::vector<ArgCommon*> pos;
@@ -94,9 +96,134 @@ namespace argparse
 			for (const char *name : arg.names)
 			{
 				auto result = flags.insert({name, &arg});
-				assert(result.second);
+				if (!result.second)
+				{ throw std::logic_error("Flag already added."); }
 			}
 		}
+
+		ParseResult parse(int argc, char *argv[]) const
+		{ return parse(argc-1, argv+1, argv[0]); }
+
+		template<class T>
+		ParseResult parse(int argc, T *argv, const char *program) const
+		{
+			ArgIter it(argc, argv, prefix);
+			return parse(it, program);
+		}
+
+		template<class T, int N>
+		ParseResult parse(T (&argv)[N], const char *program) const
+		{
+			ArgIter it(argv, prefix);
+			return parse(it, program);
+		}
+
+		ParseResult parse(ArgIter &it, const char *program) const
+		{
+			if (full_help(it)) { return {1, {}, this}; }
+			ParseResult result{0, {}, this};
+			auto posit = pos.begin();
+			while (it)
+			{
+				if (it.isflag == 1)
+				{ if (handle_shortflag(it, result)) { return result; } }
+				else if (it.isflag)
+				{ if (handle_longflag(it, result)) { return result; } }
+				else
+				{ if (handle_positional(it, result, posit)) { return result; } }
+			}
+			//TODO ensure no unparsed required arguments.
+			result.code = 0;
+			return result;
+		}
+		private:
+			//Search for full help flag. Return true if found or not.
+			bool full_help(ArgIter &it) const
+			{
+				while (it)
+				{
+					if (it.isflag == 2 && !std::strcmp(it.arg, "help"))
+					{
+						do_fullhelp();
+						return true;
+					}
+					it.step();
+				}
+				it.reset();
+				return false;
+			}
+
+			void do_shorthelp() const
+			{
+				//TODO
+			}
+
+			void do_fullhelp() const
+			{
+				do_shorthelp();
+				out << std::endl;
+				//TODO
+			}
+
+			int handle_shortflag(ArgIter &it, ParseResult &result) const
+			{
+				char check[2] = {it.arg[0], '\0'};
+				auto flag = flags.find(check);
+				if (flag == flags.end())
+				{
+					if (check[0] == 'h')
+					{
+						do_shorthelp();
+						return result.code = 1;
+					}
+					out << "Unrecognized flag \"" << prefix << check[0] << '"' << std::endl;
+					return result.code = 2;
+				}
+				it.stepflag();
+				if (!flag->second->parse(it))
+				{
+					out << "Error parsing flag \"" << prefix << check[0] << '"' << std::endl;
+					return result.code = 2;
+				}
+				result.args.insert(flag->second);
+				return 0;
+			}
+
+			int handle_longflag(ArgIter &it, ParseResult &result) const
+			{
+				const char *name = it.arg;
+				auto flag = flags.find(name);
+				if (flag == flags.end())
+				{
+					out << "Unrecognized flag \"" << prefix << prefix << it.arg << '"' << std::endl;
+					return result.code = 2;
+				}
+				it.step();
+				if (!flag->second->parse(it))
+				{
+					out << "Error parsing flag \"" << prefix << prefix << name << '"' << std::endl;
+					return result.code = 2;
+				}
+				result.args.insert(flag->second);
+				return 0;
+			}
+
+			int handle_positional(ArgIter &it, ParseResult &result, decltype(pos)::const_iterator &posit) const
+			{
+				if (posit == pos.end())
+				{
+					out << "Unrecognized argument \"" << it.arg << '"' << std::endl;
+					return result.code = 2;
+				}
+				if (!(*posit)->parse(it))
+				{
+					out << "Error parsing positional \"" << (*posit)->names[0] << '"' << std::endl;
+					return result.code = 2;
+				}
+				result.args.insert(*posit);
+				++posit;
+				return 0;
+			}
 	};
 
 

@@ -22,6 +22,32 @@ int main(int argc, char *argv[])
 	assert(!invert.required);
 	assert(!invert);
 
+	{
+		const char* args[] = {
+			"-iv1", "2", "3", "--point", "5", "6", "--1", "-3",
+			" -42"
+		};
+		auto result = p.parse(args, argv[0]);
+		assert(result.code == 0);
+		assert(invert);
+		assert(vec[0] == 1);
+		assert(vec[1] == 2);
+		assert(vec[2] == 3);
+		assert(point[0] == 5);
+		assert(point[1] == 6);
+		assert(point[2] == -3);
+		assert(*num == -42);
+		assert(result.parsed(vec));
+		assert(result.parsed(point));
+		assert(result.parsed(invert));
+		assert(result.parsed(num));
+	}
+
+	{
+		const char* args[] = {"3", "2"};
+		auto result = p.parse(args, argv[0]);
+		assert(result.code == 2);
+	}
 
 
 
