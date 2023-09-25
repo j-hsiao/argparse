@@ -6,11 +6,13 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#include <sstream>
 
-int main(int argc, char *argv[])
+int basics(const char *prog)
 {
-	argparse::Parser p("Test program", "-");
+	std::stringstream ss;
 	using namespace argparse;
+	Parser p("Test program", "-", ss);
 	Arg<int> num(p, "num", "A number, required");
 	assert(num.required);
 
@@ -23,11 +25,42 @@ int main(int argc, char *argv[])
 	assert(!invert);
 
 	{
+		const char* args[] = {"-h"};
+		auto result = p.parse(args, prog);
+		assert(result.code == result.help);
+	}
+
+	{
+		const char* args[] = {"--help"};
+		auto result = p.parse(args, prog);
+		assert(result.code == result.help);
+	}
+
+	{
+		const char* args[] = {"3", "2"};
+		auto result = p.parse(args, prog);
+		assert(result.code == result.unknown);
+	}
+
+	{
+		const char* args[] = {"-i"};
+		auto result = p.parse(args, prog);
+		assert(result.code == result.missing);
+		*invert = false;
+	}
+
+	{
+		const char* args[] = {"not an int"};
+		auto result = p.parse(args, prog);
+		assert(result.code == result.error);
+	}
+
+	{
 		const char* args[] = {
 			"-iv1", "2", "3", "--point", "5", "6", "--1", "-3",
 			" -42"
 		};
-		auto result = p.parse(args, argv[0]);
+		auto result = p.parse(args, prog);
 		assert(result.code == result.success);
 		assert(invert);
 		assert(vec[0] == 1);
@@ -43,101 +76,70 @@ int main(int argc, char *argv[])
 		assert(result.parsed(num));
 	}
 
-	{
-		const char* args[] = {"3", "2"};
-		auto result = p.parse(args, argv[0]);
-		assert(result.code == result.unknown);
-	}
-
-	{
-		const char* args[] = {"-i"};
-		auto result = p.parse(args, argv[0]);
-		assert(result.code == result.missing);
-	}
-
-	{
-		const char* args[] = {"not an int"};
-		auto result = p.parse(args, argv[0]);
-		assert(result.code == result.error);
-	}
-
-	{
-		const char* args[] = {"-h"};
-		auto result = p.parse(args, argv[0]);
-		assert(result.code == result.help);
-	}
-
-	{
-		const char* args[] = {"--help"};
-		auto result = p.parse(args, argv[0]);
-		assert(result.code == result.help);
-	}
-
-
-
-//	{
-//		argparse::Parser p;
-//
-//		auto xyz = p.add<int, 3>("xyz", "point coordinates");
-//		assert(p.pos.size() == 1);
-//		assert(p.pos[0] == &xyz);
-//		assert(xyz.required);
-//
-//		auto fxyz = p.add<int, 3>("--xyz", "point coordinates", {1,2,3});
-//		assert(p.pos.size() == 1);
-//		assert(p.flags.size() == 1);
-//		assert(p.pos[0] == &xyz);
-//		assert(p.flags[0] == &fxyz);
-//		assert(fxyz.name == std::string("xyz"));
-//		assert(!fxyz.required);
-//	}
-//
-//	{
-//		argparse::Parser p;
-//		auto hen = p.add<const char*>("-hen", "name of a hen", {"Henrietta"});
-//		auto hez = p.add<const char*>("-hez", "some flag");
-//		auto pos1 = p.add<const char*>("pos1", "some required positional argument");
-//		auto pos2 = p.add<const char*>("pos2", "some optional positional argument", {"some default"});
-//		{
-//			auto args = ::args("arg1", "whatever", "-someflag", "--someflag", "-he");
-//			argparse::ArgIter it(args.size(), args.args);
-//			assert(p.findhelp(it) == 0);
-//		}
-//		{
-//			auto args = ::args("arg1", "whatever", "-someflag", "--someflag", "-hel");
-//			argparse::ArgIter it(args.size(), args.args);
-//			assert(p.findhelp(it) == 1);
-//		}
-//		{
-//			auto args = ::args("arg1", "whatever", "-someflag", "--someflag", "-help");
-//			argparse::ArgIter it(args.size(), args.args);
-//			assert(p.findhelp(it) == 2);
-//		}
-//		{
-//			auto args = ::args("arg1", "whatever", "-someflag", "--someflag", "--h");
-//			argparse::ArgIter it(args.size(), args.args);
-//			assert(p.findhelp(it) == 1);
-//		}
-//		{
-//			auto args = ::args("arg1", "whatever", "-someflag", "--someflag", "--help");
-//			argparse::ArgIter it(args.size(), args.args);
-//			assert(p.findhelp(it) == 2);
-//		}
-//
-//		p.dohelp("programname", 1);
-//		p.dohelp("programname", 2);
-//	}
-//
-//	{
-//		argparse::Parser p;
-//		auto cam = p.group("camera");
-//		auto camname = cam.add<const char*>("name", "name of the camera source.");
-//		auto fps = cam.add<float>("-fps", "frames per second", {25});
-//		auto resolution = cam.add<int, 2>({"-shape", "-s"}, "shape of frame, width height", {1920, 1080});
-//
-//		p.dohelp("prog", 1);
-//		p.dohelp("prog", 2);
-//
-//	}
 	return 0;
+}
+
+int repeat1(const char *prog)
+{
+	using namespace argparse;
+	Parser p("repeat flag1");
+	Flag<int> f1(p, {"f", "flag1"}, "first flag", {});
+	try
+	{
+		Flag<int> f2(p, {"f", "flag2"}, "second flag", 0);
+		assert(false);
+	}
+	catch(std::logic_error &e)
+	{}
+
+	Group g(p, "group1");
+	try
+	{
+		Flag<float, 3> f2(p, {"f", "flag2"}, "second flag in group");
+		assert(false);
+	}
+	catch(std::logic_error &e)
+	{}
+	return 0;
+}
+
+int repeat2(const char *prog)
+{
+	using namespace argparse;
+	Parser p("repeat pos");
+	Arg<float, 2> f1(p, "xy", "xy coordinate");
+	Arg<float, 2> f2(p, "xy", "xy coordinate");
+	const char * args[] = {
+		"1", "2", "3", "4"
+	};
+	try
+	{
+		auto result = p.parse(args, prog);
+		assert(false);
+	}
+	catch (std::logic_error &e)
+	{}
+	return 0;
+}
+
+// considerations:
+// arg / flag
+// required / not required
+// single / fixed / variable args / toggle / count
+//
+//
+int full(const char *prog)
+{
+
+
+	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+	return (
+		basics(argv[0])
+		|| repeat1(argv[0])
+		|| full(argv[0])
+	);
 }

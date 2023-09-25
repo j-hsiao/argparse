@@ -1,5 +1,6 @@
 //Functions for determining if a type is printable or not
-
+#ifndef ARGPARSE_PRINTABLE_HPP
+#define ARGPARSE_PRINTABLE_HPP
 #include <ostream>
 
 namespace argparse { namespace check
@@ -31,3 +32,4 @@ namespace argparse { namespace check
 			NotPrintable>::value;
 	};
 }}
+#endif //ARGPARSE_PRINTABLE_HPP

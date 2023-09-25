@@ -32,6 +32,10 @@
 
 namespace argparse
 {
+	struct ArgCommon;
+	struct ArgCount { const ArgCommon *arg; };
+	struct FlagCount { const ArgCommon *arg; };
+	struct ArgDefaults { const ArgCommon *arg; };
 	struct ArgCommon
 	{
 		std::vector<const char*> names;
@@ -70,8 +74,27 @@ namespace argparse
 
 		virtual bool parse(ArgIter &it) = 0;
 		virtual std::ostream& print_count(std::ostream &o) const = 0;
+		virtual std::ostream& print_acount(std::ostream &o) const
+		{ print_count(o); return o; }
 		virtual std::ostream& print_defaults(std::ostream &o) const = 0;
 	};
+
+	inline std::ostream& operator<<(std::ostream &o, const ArgCount &c)
+	{
+		c.arg->print_acount(o);
+		return o;
+	}
+	inline std::ostream& operator<<(std::ostream &o, const FlagCount &c)
+	{
+		c.arg->print_count(o);
+		return o;
+	}
+
+	inline std::ostream& operator<<(std::ostream &o, const ArgDefaults &c)
+	{
+		c.arg->print_defaults(o);
+		return o;
+	}
 
 	struct FlagCommon: public ArgCommon
 	{
@@ -215,6 +238,8 @@ namespace argparse
 			o << " x1";
 			return o;
 		}
+		virtual std::ostream& print_acount(std::ostream &o) const override
+		{ return o; }
 	};
 
 	template<class Base>
@@ -371,9 +396,6 @@ namespace argparse
 		const data_type* operator->() const { return &this->data; }
 	};
 
-	template<class T, class V>
-	void operator<<(T&&, V&&);
-
 	template<class T, int N=1, class Base=ArgCommon, bool multi=(N<0||N>1)>
 	struct Arg: public Wrapper<BasicArg<T, N, Base>>
 	{
@@ -388,8 +410,8 @@ namespace argparse
 
 		virtual std::ostream& print_defaults(std::ostream &o) const override
 		{
-			if (!check::Printable<T>::value) { return o; }
-			o << '[';
+			if (this->required || !check::Printable<T>::value) { return o; }
+			o << " Default: [";
 			auto start = this->data.begin();
 			auto stop = this->data.end();
 			if (start != stop)
@@ -412,8 +434,8 @@ namespace argparse
 
 		virtual std::ostream& print_defaults(std::ostream &o) const override
 		{
-			if (!check::Printable<T>::value) { return o; }
-			o << this->data;
+			if (this->required || !check::Printable<T>::value) { return o; }
+			o << " Default: " << this->data;
 			return o;
 		}
 	};

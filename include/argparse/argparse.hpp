@@ -2,6 +2,7 @@
 #define ARGPARSE_HPP
 #include "argparse/arg.hpp"
 #include "argparse/argiter.hpp"
+#include "argparse/printable.hpp"
 
 #include <cstring>
 #include <iostream>
@@ -37,6 +38,28 @@ namespace argparse
 	struct lt { bool operator()(std::size_t a, std::size_t b) { return a < b; } };
 	struct gt { bool operator()(std::size_t a, std::size_t b) { return a > b; } };
 
+	struct Flagname
+	{
+		const char *prefix;
+		const char *name;
+	};
+
+	inline std::ostream& operator<<(std::ostream &o, const Flagname &f)
+	{
+		o << f.prefix;
+		if (f.name[1]) { o << f.prefix; }
+		o << f.name;
+		return o;
+	}
+
+	inline std::string& operator+=(std::string &s, const Flagname &f)
+	{
+		s += f.prefix;
+		if (f.name[1]) { s += f.prefix; }
+		s += f.name;
+		return s;
+	}
+
 	template<class Parser>
 	struct Group
 	{
@@ -54,7 +77,10 @@ namespace argparse
 		{
 			parent.add(arg);
 			if (!members.insert(&arg).second)
-			{ throw std::logic_error("Arg already added: " + std::string(arg.names[0])); }
+			{
+				throw std::logic_error(
+					"Arg already added: " + std::string(arg.names[0]));
+			}
 		}
 
 		void add(FlagCommon &arg)
@@ -63,10 +89,7 @@ namespace argparse
 			if (!members.insert(&arg).second)
 			{
 				std::string msg("Flag already added: ");
-				const char *name = most<gt>(arg.names);
-				msg += parent.prefix;
-				if (name[1]) { msg += parent.prefix; }
-				msg += name;
+				msg += Flagname{parent.prefix, most<gt>(arg.names)};
 				throw std::logic_error(msg);
 			}
 		}
@@ -107,7 +130,10 @@ namespace argparse
 		const char *prefix;
 		std::ostream &out;
 
-		Parser(const char *description, const char *prefix, std::ostream &out=std::cerr):
+		Parser(
+			const char *description, const char *prefix="-",
+			std::ostream &out=std::cerr
+		):
 			description(description),
 			prefix(prefix),
 			out(out)
@@ -149,6 +175,19 @@ namespace argparse
 
 		ParseResult parse(ArgIter &it, const char *program) const
 		{
+			{
+				std::set<const char *, Cmp> check;
+				for (auto argpt: pos)
+				{
+					if (!check.insert(argpt->names[0]).second)
+					{
+						std::string msg("Repeated positional arg \"");
+						msg += argpt->names[0];
+						msg += '"';
+						throw std::logic_error(msg);
+					}
+				}
+			}
 			if (full_help(it, program)) { return {ParseResult::help, {}, this}; }
 			ParseResult result{ParseResult::success, {}, this};
 			auto posit = pos.begin();
@@ -183,25 +222,23 @@ namespace argparse
 
 			void do_shorthelp(const char *program) const
 			{
+				const char *wrap[] = {"[]", "<>"};
 				std::set<const FlagCommon*> handled;
 				out << "Usage: " << program;
-				const char * wrap[] = {"[]", "<>"};
 				for (auto flagpair : flags)
 				{
 					auto flagpt = flagpair.second;
 					if (handled.find(flagpt) != handled.end())
 					{ continue; }
 					handled.insert(flagpt);
-					const char *name = most<lt>(flagpt->names);
-					out << ' ' << wrap[flagpt->required][0] << prefix
-						<< (name[1] ? prefix : "") << name;
-					flagpt->print_count(out) << wrap[flagpt->required][1];
+					out << ' ' << wrap[flagpt->required][0]
+						<< Flagname{prefix, most<lt>(flagpt->names)}
+						<< FlagCount{flagpt} << wrap[flagpt->required][1];
 				}
-
 				for (auto argpt : pos)
 				{
-					out << ' ' << wrap[argpt->required][0] << argpt->names[0];
-					argpt->print_count(out) << wrap[argpt->required][1];
+					out << ' ' << wrap[argpt->required][0] << argpt->names[0]
+						<< ArgCount{argpt} << wrap[argpt->required][1];
 				}
 				out << std::endl;
 			}
@@ -214,7 +251,6 @@ namespace argparse
 				std::set<ArgCommon*> handled;
 				for (Group<Parser> *group: groups)
 				{
-					out << std::endl;
 					std::vector<ArgCommon*> groupflags;
 					std::vector<ArgCommon*> grouppos;
 					for (ArgCommon *arg : group->members)
@@ -226,15 +262,64 @@ namespace argparse
 						{ groupflags.push_back(arg); }
 						handled.insert(arg);
 					}
-					out << group->name << " args:" << std::endl;
-					//TODO
-					//print each arg
+					out << std::endl << group->name << " args:" << std::endl;
+					if (groupflags.size()) { out << "  Flags:" << std::endl; }
+					for (auto &flag : groupflags) { flaghelp(flag, "    "); }
+					if (grouppos.size()) { out << "  Positional Arguments:" << std::endl; }
+					for (auto &arg : grouppos) { arghelp(arg, "    "); }
 				}
-				//TODO
-				//handle leftovers
+				bool header = true;
+				for (auto pair: flags)
+				{
+					if (handled.find(pair.second) == handled.end())
+					{
+						if (header)
+						{
+							out << std::endl << "Flags:" << std::endl;
+							header = false;
+						}
+						flaghelp(pair.second, "  ");
+					}
+				}
+				header = true;
+				for (auto argpt: pos)
+				{
+					if (handled.find(argpt) == handled.end())
+					{
+						if (header)
+						{
+							out << std::endl << "Positional Arguments:" << std::endl;
+							header = false;
+						}
+						arghelp(argpt, "  ");
+					}
+				}
 			}
 
-			int handle_shortflag(ArgIter &it, ParseResult &result, const char *program) const
+			void flaghelp(const ArgCommon *flag, const char *indent) const
+			{
+				const char *wrap[] = {"[]", "<>"};
+				auto nameit = flag->names.begin();
+				out << indent << wrap[flag->required][0]
+					<< Flagname{prefix, *nameit++};
+				for (; nameit != flag->names.end(); ++nameit)
+				{ out << " | " << Flagname{prefix, *nameit}; }
+				out << wrap[flag->required][1] << ArgDefaults{flag} << std::endl;
+				if (flag->help)
+				{ out << indent << "  " << flag->help << std::endl; }
+			}
+			void arghelp(const ArgCommon *arg, const char *indent) const
+			{
+				const char *wrap[] = {"[]", "<>"};
+				out << indent << wrap[arg->required][0] << arg->names[0]
+					<< wrap[arg->required][1] << ArgDefaults{arg} << std::endl;
+				if (arg->help)
+				{ out << indent << "  " << arg->help << std::endl; }
+			}
+
+			int handle_shortflag(
+				ArgIter &it, ParseResult &result,
+				const char *program) const
 			{
 				char check[2] = {it.arg[0], '\0'};
 				auto flag = flags.find(check);
@@ -245,13 +330,15 @@ namespace argparse
 						do_shorthelp(program);
 						return result.code = result.help;
 					}
-					out << "Unknown flag \"" << prefix << check[0] << '"' << std::endl;
+					out << "Unknown flag \"" << prefix <<
+						check[0] << '"' << std::endl;
 					return result.code = result.unknown;
 				}
 				it.stepflag();
 				if (!flag->second->parse(it))
 				{
-					out << "Error parsing flag \"" << prefix << check[0] << '"' << std::endl;
+					out << "Error parsing flag \"" << prefix
+						<< check[0] << '"' << std::endl;
 					return result.code = result.error;
 				}
 				result.args.insert(flag->second);
@@ -264,20 +351,24 @@ namespace argparse
 				auto flag = flags.find(name);
 				if (flag == flags.end())
 				{
-					out << "Unknown flag \"" << prefix << prefix << it.arg << '"' << std::endl;
+					out << "Unknown flag \"" << prefix << prefix
+						<< name << '"' << std::endl;
 					return result.code = result.unknown;
 				}
 				it.step();
 				if (!flag->second->parse(it))
 				{
-					out << "Error parsing flag \"" << prefix << prefix << name << '"' << std::endl;
+					out << "Error parsing flag \"" << prefix << prefix
+						<< name << '"' << std::endl;
 					return result.code = result.error;
 				}
 				result.args.insert(flag->second);
 				return 0;
 			}
 
-			int handle_positional(ArgIter &it, ParseResult &result, decltype(pos)::const_iterator &posit) const
+			int handle_positional(
+				ArgIter &it, ParseResult &result,
+				decltype(pos)::const_iterator &posit) const
 			{
 				if (posit == pos.end())
 				{
@@ -286,7 +377,8 @@ namespace argparse
 				}
 				if (!(*posit)->parse(it))
 				{
-					out << "Error parsing positional \"" << (*posit)->names[0] << '"' << std::endl;
+					out << "Error parsing positional \""
+						<< (*posit)->names[0] << '"' << std::endl;
 					return result.code = result.error;
 				}
 				result.args.insert(*posit);
@@ -294,23 +386,29 @@ namespace argparse
 				return 0;
 			}
 
-			void check_required(ParseResult &result, decltype(pos)::const_iterator &posit) const
+			void check_required(
+				ParseResult &result,
+				decltype(pos)::const_iterator &posit) const
 			{
 				for (; posit != pos.end(); ++posit)
 				{
 					if ((*posit)->required)
 					{
-						out << "Missing required positional argument \"" << (*posit)->names[0] << '"' << std::endl;
+						out << "Missing required positional argument \""
+							<< (*posit)->names[0] << '"' << std::endl;
 						result.code = result.missing;
 						return;
 					}
 				}
 				for (auto flagpair : flags)
 				{
-					if (flagpair.second->required && result.args.find(flagpair.second) == result.args.end())
+					if (
+						flagpair.second->required
+						&& result.args.find(flagpair.second) == result.args.end())
 					{
-						const char *name = most<gt>(flagpair.second->names);
-						out << "Missing required flag \"" << prefix << (name[1] ? prefix : "") << name << '"' << std::endl;
+						out << "Missing required flag \""
+							<< Flagname{prefix, most<gt>(flagpair.second->names)}
+							<< '"' << std::endl;
 						result.code = result.missing;
 						return;
 					}
