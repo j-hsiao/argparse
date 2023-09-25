@@ -9,9 +9,6 @@ namespace argparse { namespace check
 	template<class T>
 	struct same_type<T, T>{ static const bool value = true; };
 
-	template<class T>
-	T inst();
-
 	struct NotPrintable {};
 
 	//use T and V instead of ostream&
@@ -24,10 +21,13 @@ namespace argparse { namespace check
 	}
 
 	template<class T>
+	T& lval();
+
+	template<class T>
 	struct Printable
 	{
 		static const bool value = !same_type<
-			decltype(*static_cast<std::ostream*>(nullptr) << inst<T>()),
+			decltype(lval<std::ostream>() << lval<T>()),
 			NotPrintable>::value;
 	};
 }}
