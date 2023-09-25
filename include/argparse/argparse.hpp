@@ -9,6 +9,7 @@
 #include <set>
 #include <stdexcept>
 #include <vector>
+#include <string>
 
 //#include <array>
 //#include <cstring>
@@ -20,6 +21,22 @@
 
 namespace argparse
 {
+	template<class T>
+	const char* most(const std::vector<const char*> &names, T op={})
+	{
+		auto it = names.begin();
+		auto length = std::strlen(*it);
+		const char *nm = *it;
+		for (; it != names.end(); ++it)
+		{
+			std::size_t nl = std::strlen(*it);
+			if (op(nl, length)) { nm = *it; length = nl; }
+		}
+		return nm;
+	}
+	struct lt { bool operator()(std::size_t a, std::size_t b) { return a < b; } };
+	struct gt { bool operator()(std::size_t a, std::size_t b) { return a > b; } };
+
 	template<class Parser>
 	struct Group
 	{
@@ -31,27 +48,31 @@ namespace argparse
 			parent(parent),
 			name(name),
 			members{}
-		{
-			if (this != &parent)
-			{ parent.groups.push_back(this); }
-		}
+		{ parent.groups.push_back(this); }
 
 		void add(ArgCommon &arg)
 		{
 			parent.add(arg);
 			if (!members.insert(&arg).second)
-			{ throw std::logic_error("Arg already added"); }
+			{ throw std::logic_error("Arg already added: " + std::string(arg.names[0])); }
 		}
 
 		void add(FlagCommon &arg)
 		{
 			parent.add(arg);
 			if (!members.insert(&arg).second)
-			{ throw std::logic_error("Flag already added"); }
+			{
+				std::string msg("Flag already added: ");
+				const char *name = most<gt>(arg.names);
+				msg += parent.prefix;
+				if (name[1]) { msg += parent.prefix; }
+				msg += name;
+				throw std::logic_error(msg);
+			}
 		}
 	};
 
-	struct Parser: public Group<Parser>
+	struct Parser
 	{
 		struct Cmp
 		{
@@ -80,14 +101,13 @@ namespace argparse
 		};
 
 		std::vector<ArgCommon*> pos;
-		std::vector<Group*> groups;
+		std::vector<Group<Parser>*> groups;
 		std::map<const char*, FlagCommon*, Cmp> flags;
 		const char *description;
 		const char *prefix;
 		std::ostream &out;
 
 		Parser(const char *description, const char *prefix, std::ostream &out=std::cerr):
-			Group(*this, nullptr),
 			description(description),
 			prefix(prefix),
 			out(out)
@@ -161,22 +181,6 @@ namespace argparse
 				return false;
 			}
 
-			template<class T>
-			const char* most(const std::vector<const char*> &names, T op={}) const
-			{
-				auto it = names.begin();
-				auto length = std::strlen(*it);
-				const char *nm = *it;
-				for (; it != names.end(); ++it)
-				{
-					std::size_t nl = std::strlen(*it);
-					if (op(nl, length)) { nm = *it; length = nl; }
-				}
-				return nm;
-			}
-			struct lt { bool operator()(std::size_t a, std::size_t b) { return a < b; } };
-			struct gt { bool operator()(std::size_t a, std::size_t b) { return a > b; } };
-
 			void do_shorthelp(const char *program) const
 			{
 				std::set<const FlagCommon*> handled;
@@ -205,8 +209,29 @@ namespace argparse
 			void do_fullhelp(const char *program) const
 			{
 				do_shorthelp(program);
-				out << std::endl;
+				if (description)
+				{ out << std::endl << description << std::endl; }
+				std::set<ArgCommon*> handled;
+				for (Group<Parser> *group: groups)
+				{
+					out << std::endl;
+					std::vector<ArgCommon*> groupflags;
+					std::vector<ArgCommon*> grouppos;
+					for (ArgCommon *arg : group->members)
+					{
+						auto it = flags.find(arg->names[0]);
+						if (it == flags.end() || it->second != arg)
+						{ grouppos.push_back(arg); }
+						else
+						{ groupflags.push_back(arg); }
+						handled.insert(arg);
+					}
+					out << group->name << " args:" << std::endl;
+					//TODO
+					//print each arg
+				}
 				//TODO
+				//handle leftovers
 			}
 
 			int handle_shortflag(ArgIter &it, ParseResult &result, const char *program) const

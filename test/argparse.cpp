@@ -67,6 +67,12 @@ int main(int argc, char *argv[])
 		assert(result.code == result.help);
 	}
 
+	{
+		const char* args[] = {"--help"};
+		auto result = p.parse(args, argv[0]);
+		assert(result.code == result.help);
+	}
+
 
 
 //	{
