@@ -61,6 +61,15 @@ namespace argparse
 
 		struct ParseResult
 		{
+			enum codes: int
+			{
+				success = 0,
+				help = 1,
+				missing = 2,
+				unknown = 3,
+				error = 4
+			};
+
 			int code;
 			std::set<const ArgCommon*> args;
 			const Parser *parent;
@@ -120,31 +129,30 @@ namespace argparse
 
 		ParseResult parse(ArgIter &it, const char *program) const
 		{
-			if (full_help(it)) { return {1, {}, this}; }
-			ParseResult result{0, {}, this};
+			if (full_help(it, program)) { return {ParseResult::help, {}, this}; }
+			ParseResult result{ParseResult::success, {}, this};
 			auto posit = pos.begin();
 			while (it)
 			{
 				if (it.isflag == 1)
-				{ if (handle_shortflag(it, result)) { return result; } }
+				{ if (handle_shortflag(it, result, program)) { return result; } }
 				else if (it.isflag)
 				{ if (handle_longflag(it, result)) { return result; } }
 				else
 				{ if (handle_positional(it, result, posit)) { return result; } }
 			}
-			//TODO ensure no unparsed required arguments.
-			result.code = 0;
+			check_required(result, posit);
 			return result;
 		}
 		private:
 			//Search for full help flag. Return true if found or not.
-			bool full_help(ArgIter &it) const
+			bool full_help(ArgIter &it, const char *program) const
 			{
 				while (it)
 				{
 					if (it.isflag == 2 && !std::strcmp(it.arg, "help"))
 					{
-						do_fullhelp();
+						do_fullhelp(program);
 						return true;
 					}
 					it.step();
@@ -153,37 +161,73 @@ namespace argparse
 				return false;
 			}
 
-			void do_shorthelp() const
+			template<class T>
+			const char* most(const std::vector<const char*> &names, T op={}) const
 			{
-				//TODO
+				auto it = names.begin();
+				auto length = std::strlen(*it);
+				const char *nm = *it;
+				for (; it != names.end(); ++it)
+				{
+					std::size_t nl = std::strlen(*it);
+					if (op(nl, length)) { nm = *it; length = nl; }
+				}
+				return nm;
+			}
+			struct lt { bool operator()(std::size_t a, std::size_t b) { return a < b; } };
+			struct gt { bool operator()(std::size_t a, std::size_t b) { return a > b; } };
+
+			void do_shorthelp(const char *program) const
+			{
+				std::set<const FlagCommon*> handled;
+				out << "Usage: " << program;
+				const char * wrap[] = {"[]", "<>"};
+				for (auto flagpair : flags)
+				{
+					auto flagpt = flagpair.second;
+					if (handled.find(flagpt) != handled.end())
+					{ continue; }
+					handled.insert(flagpt);
+					const char *name = most<lt>(flagpt->names);
+					out << ' ' << wrap[flagpt->required][0] << prefix
+						<< (name[1] ? prefix : "") << name;
+					flagpt->print_count(out) << wrap[flagpt->required][1];
+				}
+
+				for (auto argpt : pos)
+				{
+					out << ' ' << wrap[argpt->required][0] << argpt->names[0];
+					argpt->print_count(out) << wrap[argpt->required][1];
+				}
+				out << std::endl;
 			}
 
-			void do_fullhelp() const
+			void do_fullhelp(const char *program) const
 			{
-				do_shorthelp();
+				do_shorthelp(program);
 				out << std::endl;
 				//TODO
 			}
 
-			int handle_shortflag(ArgIter &it, ParseResult &result) const
+			int handle_shortflag(ArgIter &it, ParseResult &result, const char *program) const
 			{
 				char check[2] = {it.arg[0], '\0'};
 				auto flag = flags.find(check);
 				if (flag == flags.end())
 				{
-					if (check[0] == 'h')
+					if (check[0] == 'h' && !it.arg[1])
 					{
-						do_shorthelp();
-						return result.code = 1;
+						do_shorthelp(program);
+						return result.code = result.help;
 					}
-					out << "Unrecognized flag \"" << prefix << check[0] << '"' << std::endl;
-					return result.code = 2;
+					out << "Unknown flag \"" << prefix << check[0] << '"' << std::endl;
+					return result.code = result.unknown;
 				}
 				it.stepflag();
 				if (!flag->second->parse(it))
 				{
 					out << "Error parsing flag \"" << prefix << check[0] << '"' << std::endl;
-					return result.code = 2;
+					return result.code = result.error;
 				}
 				result.args.insert(flag->second);
 				return 0;
@@ -195,14 +239,14 @@ namespace argparse
 				auto flag = flags.find(name);
 				if (flag == flags.end())
 				{
-					out << "Unrecognized flag \"" << prefix << prefix << it.arg << '"' << std::endl;
-					return result.code = 2;
+					out << "Unknown flag \"" << prefix << prefix << it.arg << '"' << std::endl;
+					return result.code = result.unknown;
 				}
 				it.step();
 				if (!flag->second->parse(it))
 				{
 					out << "Error parsing flag \"" << prefix << prefix << name << '"' << std::endl;
-					return result.code = 2;
+					return result.code = result.error;
 				}
 				result.args.insert(flag->second);
 				return 0;
@@ -212,17 +256,40 @@ namespace argparse
 			{
 				if (posit == pos.end())
 				{
-					out << "Unrecognized argument \"" << it.arg << '"' << std::endl;
-					return result.code = 2;
+					out << "Unknown argument \"" << it.arg << '"' << std::endl;
+					return result.code = result.unknown;
 				}
 				if (!(*posit)->parse(it))
 				{
 					out << "Error parsing positional \"" << (*posit)->names[0] << '"' << std::endl;
-					return result.code = 2;
+					return result.code = result.error;
 				}
 				result.args.insert(*posit);
 				++posit;
 				return 0;
+			}
+
+			void check_required(ParseResult &result, decltype(pos)::const_iterator &posit) const
+			{
+				for (; posit != pos.end(); ++posit)
+				{
+					if ((*posit)->required)
+					{
+						out << "Missing required positional argument \"" << (*posit)->names[0] << '"' << std::endl;
+						result.code = result.missing;
+						return;
+					}
+				}
+				for (auto flagpair : flags)
+				{
+					if (flagpair.second->required && result.args.find(flagpair.second) == result.args.end())
+					{
+						const char *name = most<gt>(flagpair.second->names);
+						out << "Missing required flag \"" << prefix << (name[1] ? prefix : "") << name << '"' << std::endl;
+						result.code = result.missing;
+						return;
+					}
+				}
 			}
 	};
 

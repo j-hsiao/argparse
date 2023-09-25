@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 			" -42"
 		};
 		auto result = p.parse(args, argv[0]);
-		assert(result.code == 0);
+		assert(result.code == result.success);
 		assert(invert);
 		assert(vec[0] == 1);
 		assert(vec[1] == 2);
@@ -46,7 +46,25 @@ int main(int argc, char *argv[])
 	{
 		const char* args[] = {"3", "2"};
 		auto result = p.parse(args, argv[0]);
-		assert(result.code == 2);
+		assert(result.code == result.unknown);
+	}
+
+	{
+		const char* args[] = {"-i"};
+		auto result = p.parse(args, argv[0]);
+		assert(result.code == result.missing);
+	}
+
+	{
+		const char* args[] = {"not an int"};
+		auto result = p.parse(args, argv[0]);
+		assert(result.code == result.error);
+	}
+
+	{
+		const char* args[] = {"-h"};
+		auto result = p.parse(args, argv[0]);
+		assert(result.code == result.help);
 	}
 
 

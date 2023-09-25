@@ -53,8 +53,8 @@ namespace argparse
 			{ throw std::logic_error("Argument requires at least 1 name."); }
 			for (const char *name : names)
 			{
-				if (!name)
-				{ throw std::logic_error("Arg name should not be null."); }
+				if (!name || !name[0])
+				{ throw std::logic_error("Arg name should not be null or empty."); }
 			}
 			if (p) { p->add(*this); }
 		}
@@ -69,8 +69,8 @@ namespace argparse
 		{}
 
 		virtual bool parse(ArgIter &it) = 0;
-		virtual void print_count(std::ostream &o) const = 0;
-		virtual void print_defaults(std::ostream &o) const = 0;
+		virtual std::ostream& print_count(std::ostream &o) const = 0;
+		virtual std::ostream& print_defaults(std::ostream &o) const = 0;
 	};
 
 	struct FlagCommon: public ArgCommon
@@ -136,8 +136,11 @@ namespace argparse
 			return true;
 		}
 
-		virtual void print_count(std::ostream &o) const override
-		{ o << " x" << N; }
+		virtual std::ostream& print_count(std::ostream &o) const override
+		{
+			o << " x" << N;
+			return o;
+		}
 	};
 
 	//Variable arguments
@@ -174,8 +177,11 @@ namespace argparse
 			return true;
 		}
 
-		virtual void print_count(std::ostream &o) const override
-		{ o << " ..."; }
+		virtual std::ostream& printcount(std::ostream &o) const override
+		{
+			o << " ...";
+			return o;
+		}
 	};
 
 	template<class T, class Base>
@@ -204,7 +210,11 @@ namespace argparse
 		virtual bool parse(ArgIter &it) override
 		{ return argparse::parse(data, it); }
 
-		virtual void print_count(std::ostream &o) const override { o << " x1"; }
+		virtual std::ostream& print_count(std::ostream &o) const override
+		{
+			o << " x1";
+			return o;
+		}
 	};
 
 	template<class Base>
@@ -237,8 +247,11 @@ namespace argparse
 			return true;
 		}
 
-		virtual void print_count(std::ostream &o) const override
-		{ o << "!!"; }
+		virtual std::ostream& print_count(std::ostream &o) const override
+		{
+			o << " !!";
+			return o;
+		}
 
 		operator bool() const { return data; }
 	};
@@ -273,8 +286,11 @@ namespace argparse
 			return true;
 		}
 
-		virtual void print_count(std::ostream &o) const override
-		{ o << "++"; }
+		virtual std::ostream& print_count(std::ostream &o) const override
+		 {
+			o << " ++";
+			return o;
+		}
 
 		operator int() const { return data; }
 	};
@@ -370,9 +386,9 @@ namespace argparse
 		const T& operator[](std::size_t idx) const
 		{ return this->data[idx]; }
 
-		virtual void print_defaults(std::ostream &o) const override
+		virtual std::ostream& print_defaults(std::ostream &o) const override
 		{
-			if (!check::Printable<T>::value) { return; }
+			if (!check::Printable<T>::value) { return o; }
 			o << '[';
 			auto start = this->data.begin();
 			auto stop = this->data.end();
@@ -384,6 +400,7 @@ namespace argparse
 			for (; start != stop; ++start)
 			{ o << ", " << *start; }
 			o << ']';
+			return o;
 		}
 	};
 
@@ -393,10 +410,11 @@ namespace argparse
 		typedef Wrapper<BasicArg<T, N, Base>> par;
 		using par::par;
 
-		virtual void print_defaults(std::ostream &o) const override
+		virtual std::ostream& print_defaults(std::ostream &o) const override
 		{
-			if (!check::Printable<T>::value) { return; }
+			if (!check::Printable<T>::value) { return o; }
 			o << this->data;
+			return o;
 		}
 	};
 
