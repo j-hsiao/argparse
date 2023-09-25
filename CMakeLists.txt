@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 project(argparse VERSION 0.4 LANGUAGES CXX)
-add_library(${PROJECT_NAME} INTERFACE)
+add_library(${PROJECT_NAME} src/argparse.cpp)
 target_include_directories(
-	${PROJECT_NAME}
-	INTERFACE
+	${PROJECT_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
 	$<INSTALL_INTERFACE:include>)
 
@@ -14,6 +13,9 @@ install(
 install(
 	TARGETS ${PROJECT_NAME}
 	EXPORT ${PROJECT_NAME}
+	RUNTIME DESTINATION bin
+	LIBRARY DESTINATION lib
+	ARCHIVE DESTINATION lib
 )
 install(
 	EXPORT ${PROJECT_NAME}

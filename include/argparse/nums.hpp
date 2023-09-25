@@ -50,23 +50,15 @@ namespace argparse
 		return !*end;
 	}
 
-#define SPECIALIZE(T, valcheck, prefix) \
+#define DECLARE_SPECIALIZATION(T, prefix) \
 	template<> \
-	bool store<prefix T>(prefix T &dst, const char *arg, int base) \
-	{ \
-		prefix long long v; \
-		if (store(v, arg, base) && valcheck) \
-		{ \
-			dst = static_cast<prefix T>(v); \
-			return true; \
-		} \
-		return false; \
-	}
-	SPECIALIZE(int, INT_MIN <= v && v <= INT_MAX, )
-	SPECIALIZE(short, SHRT_MIN <= v && v <= SHRT_MAX, )
-	SPECIALIZE(short, v <= USHRT_MAX, unsigned)
-	SPECIALIZE(int, v <= UINT_MAX, unsigned)
-#undef SPECIALIZE
+	bool store<prefix T>(prefix T &dst, const char *arg, int base);
+
+	DECLARE_SPECIALIZATION(short, )
+	DECLARE_SPECIALIZATION(int, )
+	DECLARE_SPECIALIZATION(short, unsigned)
+	DECLARE_SPECIALIZATION(int, unsigned)
+#undef DECLARE_SPECIALIZATION
 
 	//A base numbase number.
 	template<class T, int numbase>

@@ -32,10 +32,6 @@
 
 namespace argparse
 {
-	struct ArgCommon;
-	struct ArgCount { const ArgCommon *arg; };
-	struct FlagCount { const ArgCommon *arg; };
-	struct ArgDefaults { const ArgCommon *arg; };
 	struct ArgCommon
 	{
 		std::vector<const char*> names;
@@ -78,23 +74,6 @@ namespace argparse
 		{ print_count(o); return o; }
 		virtual std::ostream& print_defaults(std::ostream &o) const = 0;
 	};
-
-	inline std::ostream& operator<<(std::ostream &o, const ArgCount &c)
-	{
-		c.arg->print_acount(o);
-		return o;
-	}
-	inline std::ostream& operator<<(std::ostream &o, const FlagCount &c)
-	{
-		c.arg->print_count(o);
-		return o;
-	}
-
-	inline std::ostream& operator<<(std::ostream &o, const ArgDefaults &c)
-	{
-		c.arg->print_defaults(o);
-		return o;
-	}
 
 	struct FlagCommon: public ArgCommon
 	{
