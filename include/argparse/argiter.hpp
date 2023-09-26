@@ -79,7 +79,7 @@ namespace argparse
 		}
 
 		bool breakpoint() const
-		{ return isflag == 2 && argv[pos][2] == '0' && !argv[pos][3]; }
+		{ return isflag == 2 && !std::strcmp(argv[pos]+2, "0"); }
 
 		//name of flag without prefix chars
 		const char* flag() const

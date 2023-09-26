@@ -8,9 +8,7 @@
 #include <iostream>
 #include <map>
 #include <set>
-#include <stdexcept>
 #include <vector>
-#include <string>
 
 namespace argparse
 {
@@ -86,7 +84,9 @@ namespace argparse
 			void do_fullhelp(const char *program) const;
 
 			void flaghelp(const ArgCommon *flag, const char *indent) const;
-			void arghelp(const ArgCommon *arg, const char *indent) const;
+			void arghelp(
+				const ArgCommon *arg, const char *indent,
+				const std::map<const char *, int, Cmp> &count) const;
 
 			int handle_shortflag(
 				ArgIter &it, ParseResult &result,

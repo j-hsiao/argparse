@@ -88,6 +88,7 @@ namespace argparse
 		{ if (p) { p->add(*this); } }
 	};
 
+	struct Dummy {};
 	//Fixed num of multiple arguments
 	template<class T, int N, class Base>
 	struct FixedArgs: public Base
@@ -119,8 +120,6 @@ namespace argparse
 			}
 		}
 
-		struct Dummy {};
-
 		template<class Parser>
 		FixedArgs(
 			Parser &p, std::initializer_list<const char*> names,
@@ -130,11 +129,10 @@ namespace argparse
 			data{}
 		{}
 
-
 		virtual bool parse(ArgIter &it) override
 		{
 			for (int i = 0; i < N; ++i)
-			{ if (!argparse::parse(data[i], it)) { return false; } }
+			{ if (!argparse::adl_parse(data[i], it)) { return false; } }
 			return true;
 		}
 
@@ -174,12 +172,14 @@ namespace argparse
 		{
 			data.clear();
 			T tmp;
-			while (argparse::parse(tmp, it))
+			while (argparse::adl_parse(tmp, it))
 			{ data.push_back(tmp); }
+			if (it && it.breakpoint())
+			{ it.step(); }
 			return true;
 		}
 
-		virtual std::ostream& printcount(std::ostream &o) const override
+		virtual std::ostream& print_count(std::ostream &o) const override
 		{
 			o << " ...";
 			return o;
@@ -210,7 +210,7 @@ namespace argparse
 		{}
 
 		virtual bool parse(ArgIter &it) override
-		{ return argparse::parse(data, it); }
+		{ return argparse::adl_parse(data, it); }
 
 		virtual std::ostream& print_count(std::ostream &o) const override
 		{
@@ -359,6 +359,14 @@ namespace argparse
 		):
 			FixedArgs<T, N, Base>(p, {name}, help, defaults)
 		{}
+
+		template<class Parser>
+		BasicArg(
+			Parser &p, const char *name,
+			const char *help, Dummy d
+		):
+			FixedArgs<T, N, Base>(p, {name}, help, d)
+		{}
 	};
 
 	template<class impl>
@@ -387,20 +395,30 @@ namespace argparse
 		const T& operator[](std::size_t idx) const
 		{ return this->data[idx]; }
 
-		virtual std::ostream& print_defaults(std::ostream &o) const override
+		std::ostream& print_value(std::ostream &o) const
 		{
-			if (this->required || !check::Printable<T>::value) { return o; }
-			o << " Default: [";
 			auto start = this->data.begin();
 			auto stop = this->data.end();
+			o << "[";
 			if (start != stop)
 			{
-				o << *start;
+				check::print(o, *start);
 				++start;
 			}
 			for (; start != stop; ++start)
-			{ o << ", " << *start; }
+			{
+				o << ", ";
+				check::print(o, *start);
+			}
 			o << ']';
+			return o;
+		}
+
+		virtual std::ostream& print_defaults(std::ostream &o) const override
+		{
+			if (this->required || !check::Printable<T>::value) { return o; }
+			o << " Default: ";
+			print_value(o);
 			return o;
 		}
 	};
@@ -411,13 +429,27 @@ namespace argparse
 		typedef Wrapper<BasicArg<T, N, Base>> par;
 		using par::par;
 
+		std::ostream& print_value(std::ostream &o) const
+		{
+			check::print(o, this->data);
+			return o;
+		}
+
 		virtual std::ostream& print_defaults(std::ostream &o) const override
 		{
 			if (this->required || !check::Printable<T>::value) { return o; }
-			o << " Default: " << this->data;
+			o << " Default: ";
+			print_value(o);
 			return o;
 		}
 	};
+
+	template<class T, int N, class Base>
+	std::ostream& operator<<(std::ostream &o, Arg<T, N, Base> &a)
+	{
+		a.print_value(o);
+		return o;
+	}
 
 	template<class T, int N=1, class Base=FlagCommon>
 	struct Flag: public Arg<T, N, Base>

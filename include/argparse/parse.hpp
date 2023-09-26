@@ -27,4 +27,8 @@ namespace argparse
 		}
 		return false;
 	}
+
+	template<class T>
+	bool adl_parse(T &out, ArgIter &it)
+	{ return parse(out, it); }
 }

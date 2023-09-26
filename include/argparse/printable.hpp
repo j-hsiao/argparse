@@ -21,6 +21,13 @@ namespace argparse { namespace check
 		return {};
 	}
 
+	template<class T, class V>
+	T& print(T &t, const V &v)
+	{
+		t << v;
+		return t;
+	}
+
 	template<class T>
 	T& lval();
 

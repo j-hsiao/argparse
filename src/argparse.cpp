@@ -1,4 +1,11 @@
 #include "argparse/nums.hpp"
+
+#include <cstring>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
 namespace argparse
 {
 #define SPECIALIZE(T, valcheck, prefix) \
@@ -48,7 +55,7 @@ namespace argparse
 			const char *name;
 		};
 
-		inline std::ostream& operator<<(std::ostream &o, const Flagname &f)
+		std::ostream& operator<<(std::ostream &o, const Flagname &f)
 		{
 			o << f.prefix;
 			if (f.name[1]) { o << f.prefix; }
@@ -56,7 +63,7 @@ namespace argparse
 			return o;
 		}
 
-		inline std::string& operator+=(std::string &s, const Flagname &f)
+		std::string& operator+=(std::string &s, const Flagname &f)
 		{
 			s += f.prefix;
 			if (f.name[1]) { s += f.prefix; }
@@ -68,18 +75,18 @@ namespace argparse
 		struct FlagCount { const ArgCommon *arg; };
 		struct ArgDefaults { const ArgCommon *arg; };
 
-		inline std::ostream& operator<<(std::ostream &o, const ArgCount &c)
+		std::ostream& operator<<(std::ostream &o, const ArgCount &c)
 		{
 			c.arg->print_acount(o);
 			return o;
 		}
-		inline std::ostream& operator<<(std::ostream &o, const FlagCount &c)
+		std::ostream& operator<<(std::ostream &o, const FlagCount &c)
 		{
 			c.arg->print_count(o);
 			return o;
 		}
 
-		inline std::ostream& operator<<(std::ostream &o, const ArgDefaults &c)
+		std::ostream& operator<<(std::ostream &o, const ArgDefaults &c)
 		{
 			c.arg->print_defaults(o);
 			return o;
@@ -99,6 +106,11 @@ namespace argparse
 	{
 		if (arg.names.size() > 1)
 		{ throw std::logic_error("Positional arg should have only 1 name."); }
+		if (pos.size() && arg.required && !pos.back()->required)
+		{
+			throw std::logic_error(
+				"Required positional arg after optional positional arg.");
+		}
 		pos.push_back(&arg);
 	}
 
@@ -114,19 +126,6 @@ namespace argparse
 
 	Parser::ParseResult Parser::parse(ArgIter &it, const char *program) const
 	{
-		{
-			std::set<const char *, Cmp> check;
-			for (auto argpt: pos)
-			{
-				if (!check.insert(argpt->names[0]).second)
-				{
-					std::string msg("Repeated positional arg \"");
-					msg += argpt->names[0];
-					msg += '"';
-					throw std::logic_error(msg);
-				}
-			}
-		}
 		if (full_help(it, program)) { return {ParseResult::help, {}, this}; }
 		ParseResult result{ParseResult::success, {}, this};
 		auto posit = pos.begin();
@@ -134,7 +133,7 @@ namespace argparse
 		{
 			if (it.isflag == 1)
 			{ if (handle_shortflag(it, result, program)) { return result; } }
-			else if (it.isflag)
+			else if (it.isflag && !it.breakpoint())
 			{ if (handle_longflag(it, result)) { return result; } }
 			else
 			{ if (handle_positional(it, result, posit)) { return result; } }
@@ -183,6 +182,17 @@ namespace argparse
 
 	void Parser::do_fullhelp(const char *program) const
 	{
+		std::map<const char *, int, Cmp> namecount;
+		for (auto argpt: pos)
+		{
+			auto result = namecount.insert({argpt->names[0], 1});
+			if (!result.second)
+			{
+				result.first->second += 1;
+				out << "repeated arg: " << argpt->names[0] << std::endl;
+			}
+		}
+
 		do_shorthelp(program);
 		if (description)
 		{ out << std::endl << description << std::endl; }
@@ -204,7 +214,7 @@ namespace argparse
 			if (groupflags.size()) { out << "  Flags:" << std::endl; }
 			for (auto &flag : groupflags) { flaghelp(flag, "    "); }
 			if (grouppos.size()) { out << "  Positional Arguments:" << std::endl; }
-			for (auto &arg : grouppos) { arghelp(arg, "    "); }
+			for (auto &arg : grouppos) { arghelp(arg, "    ", namecount); }
 		}
 		bool header = true;
 		for (auto pair: flags)
@@ -229,7 +239,7 @@ namespace argparse
 					out << std::endl << "Positional Arguments:" << std::endl;
 					header = false;
 				}
-				arghelp(argpt, "  ");
+				arghelp(argpt, "  ", namecount);
 			}
 		}
 	}
@@ -247,13 +257,26 @@ namespace argparse
 		{ out << indent << "  " << flag->help << std::endl; }
 	}
 
-	void Parser::arghelp(const ArgCommon *arg, const char *indent) const
+	void Parser::arghelp(
+		const ArgCommon *arg, const char *indent,
+		const std::map<const char *, int, Cmp> &namecount) const
 	{
 		const char *wrap[] = {"[]", "<>"};
 		out << indent << wrap[arg->required][0] << arg->names[0]
-			<< wrap[arg->required][1] << ArgDefaults{arg} << std::endl;
-		if (arg->help)
-		{ out << indent << "  " << arg->help << std::endl; }
+			<< wrap[arg->required][1];
+		if (namecount.at(arg->names[0]) > 1)
+		{
+			for (std::size_t i=0; i<pos.size(); ++i)
+			{
+				if (pos[i] == arg)
+				{
+					out << " (Positional index " << i << ')';
+					i = pos.size();
+				}
+			}
+		}
+		out << ArgDefaults{arg} << std::endl;
+		if (arg->help) { out << indent << "  " << arg->help << std::endl; }
 	}
 
 	int Parser::handle_shortflag(

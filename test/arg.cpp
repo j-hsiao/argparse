@@ -9,21 +9,16 @@
 #include <array>
 #include <vector>
 
-struct Point { int x, y; };
-bool operator==(const Point &a, const Point &b)
-{ return a.x == b.x && a.y == b.y; }
-
-namespace argparse
+namespace mynamespace
 {
-	template<>
-	bool parse(Point &dst, ArgIter &it)
+	struct Point { int x, y; };
+	bool operator==(const Point &a, const Point &b)
+	{ return a.x == b.x && a.y == b.y; }
+
+	bool parse(Point &dst, argparse::ArgIter &it)
 	{ return parse(dst.x, it) && parse(dst.y, it); }
 }
-//std::ostream& operator<<(std::ostream &o, const Point &p)
-//{
-//	o << '<' << p.x << ',' << p.y << '>';
-//	return o;
-//}
+
 
 struct DummyParser
 {
@@ -63,6 +58,7 @@ int main(int argc, char *argv[])
 	}
 	it.reset();
 	{
+		using namespace mynamespace;
 		std::initializer_list<Point> fk{{1,2}, {3,4}};
 		argparse::Arg<Point, -1> mypoints(dummy, "points", "2 points", {{1,2}, {3,4}});
 		assert(!dummy.wasflag);
@@ -84,6 +80,7 @@ int main(int argc, char *argv[])
 	}
 	it.reset();
 	{
+		using namespace mynamespace;
 		argparse::Arg<Point> mypoint(dummy, "point", "x y");
 		assert(!dummy.wasflag);
 		mypoint.parse(it);
