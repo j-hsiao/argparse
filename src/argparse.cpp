@@ -126,7 +126,7 @@ namespace argparse
 
 	Parser::ParseResult Parser::parse(ArgIter &it, const char *program) const
 	{
-		if (full_help(it, program)) { return {ParseResult::help, {}, this}; }
+		if (prehelp(it, program)) { return {ParseResult::help, {}, this}; }
 		ParseResult result{ParseResult::success, {}, this};
 		auto posit = pos.begin();
 		while (it)
@@ -142,13 +142,18 @@ namespace argparse
 		return result;
 	}
 
-	bool Parser::full_help(ArgIter &it, const char *program) const
+	bool Parser::prehelp(ArgIter &it, const char *program) const
 	{
 		while (it)
 		{
-			if (it.isflag == 2 && !std::strcmp(it.arg, "help"))
+			if (it.isflag == 2 && !std::strcmp(it.arg, "help") && flags.find("help") == flags.end())
 			{
 				do_fullhelp(program);
+				return true;
+			}
+			else if (it.isflag == 1 && !std::strcmp(it.arg, "h") && flags.find("h") == flags.end())
+			{
+				do_shorthelp(program);
 				return true;
 			}
 			it.step();

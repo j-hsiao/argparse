@@ -445,7 +445,7 @@ namespace argparse
 	};
 
 	template<class T, int N, class Base>
-	std::ostream& operator<<(std::ostream &o, Arg<T, N, Base> &a)
+	std::ostream& operator<<(std::ostream &o, const Arg<T, N, Base> &a)
 	{
 		a.print_value(o);
 		return o;

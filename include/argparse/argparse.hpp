@@ -77,7 +77,7 @@ namespace argparse
 
 		private:
 			//Search for full help flag. Return true if found or not.
-			bool full_help(ArgIter &it, const char *program) const;
+			bool prehelp(ArgIter &it, const char *program) const;
 
 			void do_shorthelp(const char *program) const;
 
