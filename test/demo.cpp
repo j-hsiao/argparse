@@ -21,7 +21,7 @@ namespace mynamespace
 namespace
 {
 	template<class T>
-	void display(const char *desc, argparse::Parser::ParseResult &result, const T &t)
+	void display(const char *desc, argparse::ParseResult &result, const T &t)
 	{
 		std::cout << desc << ": ";
 		if (result.parsed(t))

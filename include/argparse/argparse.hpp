@@ -13,6 +13,28 @@
 namespace argparse
 {
 	struct Group;
+	struct Parser;
+
+	struct ParseResult
+	{
+		enum codes: int
+		{
+			success = 0,
+			help = 1,
+			missing = 2,
+			unknown = 3,
+			error = 4
+		};
+
+		int code;
+		std::set<const ArgCommon*> args;
+		const Parser *parent;
+		operator bool() const { return code; }
+
+		bool parsed(const ArgCommon &arg) const
+		{ return args.find(&arg) != args.end(); }
+	};
+
 
 	struct Parser
 	{
@@ -20,26 +42,6 @@ namespace argparse
 		{
 			bool operator()(const char *a, const char *b) const
 			{ return std::strcmp(a, b) < 0; }
-		};
-
-		struct ParseResult
-		{
-			enum codes: int
-			{
-				success = 0,
-				help = 1,
-				missing = 2,
-				unknown = 3,
-				error = 4
-			};
-
-			int code;
-			std::set<const ArgCommon*> args;
-			const Parser *parent;
-			operator bool() const { return code; }
-
-			bool parsed(const ArgCommon &arg)
-			{ return args.find(&arg) != args.end(); }
 		};
 
 		std::vector<ArgCommon*> pos;

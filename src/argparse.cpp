@@ -124,7 +124,7 @@ namespace argparse
 		}
 	}
 
-	Parser::ParseResult Parser::parse(ArgIter &it, const char *program) const
+	ParseResult Parser::parse(ArgIter &it, const char *program) const
 	{
 		if (prehelp(it, program)) { return {ParseResult::help, {}, this}; }
 		ParseResult result{ParseResult::success, {}, this};
