@@ -1,4 +1,5 @@
 #include "argparse/nums.hpp"
+#include "argparse/argparse.hpp"
 
 #include <cstring>
 #include <set>
@@ -25,11 +26,7 @@ namespace argparse
 	SPECIALIZE(short, v <= USHRT_MAX, unsigned)
 	SPECIALIZE(int, v <= UINT_MAX, unsigned)
 #undef SPECIALIZE
-}
 
-#include "argparse/argparse.hpp"
-namespace argparse
-{
 	namespace
 	{
 		template<class T>

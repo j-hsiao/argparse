@@ -63,6 +63,7 @@ namespace argparse
 
 		operator bool() const { return pos < argc; }
 
+		void finish() { pos = argc; }
 		void reset()
 		{
 			pos = -1;

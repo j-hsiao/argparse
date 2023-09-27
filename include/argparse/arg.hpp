@@ -48,16 +48,7 @@ namespace argparse
 			const char *help, bool required
 		):
 			ArgCommon(names, help, required)
-		{
-			if (!this->names.size())
-			{ throw std::logic_error("Argument requires at least 1 name."); }
-			for (const char *name : names)
-			{
-				if (!name || !name[0])
-				{ throw std::logic_error("Arg name should not be null or empty."); }
-			}
-			if (p) { p->add(*this); }
-		}
+		{ if (p) { p->add(*this); } }
 
 		ArgCommon(
 			std::initializer_list<const char*> names,
@@ -66,7 +57,15 @@ namespace argparse
 			names(names),
 			help(help),
 			required(required)
-		{}
+		{
+			if (!this->names.size())
+			{ throw std::logic_error("Argument requires at least 1 name."); }
+			for (const char *name : names)
+			{
+				if (!name || !name[0])
+				{ throw std::logic_error("Arg name should not be null or empty."); }
+			}
+		}
 
 		virtual bool parse(ArgIter &it) = 0;
 		virtual std::ostream& print_count(std::ostream &o) const = 0;
@@ -444,6 +443,48 @@ namespace argparse
 		}
 	};
 
+	//remainder args
+	template<class Base>
+	struct Arg<const char*, -2, Base, true>: public Base
+	{
+		ArgIter data;
+
+		template<class Parser>
+		Arg(Parser &p, const char *name, const char *help=nullptr):
+			Arg(p, {name}, help)
+		{}
+
+		template<class Parser>
+		Arg(Parser &p, std::initializer_list<const char*> names, const char *help=nullptr):
+			Base(&p, names, help, false),
+			data(0, nullptr, "")
+		{}
+
+		bool parse(ArgIter &it) override
+		{
+			if (it.isflag) { return false; }
+			data = it;
+			it.finish();
+			return true;
+		}
+
+		operator ArgIter&() { return data; }
+		operator const ArgIter&() const { return data; }
+
+		std::ostream& print_count(std::ostream &o) const
+		{
+			o << " ***";
+			return o;
+		}
+		std::ostream& print_defaults(std::ostream &o) { return o; }
+
+		data_type& operator*() { return this->data; }
+		const data_type& operator*() const { return this->data; }
+
+		data_type* operator->() { return &this->data; }
+		const data_type* operator->() const { return &this->data; }
+	};
+
 	template<class T, int N, class Base>
 	std::ostream& operator<<(std::ostream &o, const Arg<T, N, Base> &a)
 	{
@@ -454,6 +495,15 @@ namespace argparse
 	template<class T, int N=1, class Base=FlagCommon>
 	struct Flag: public Arg<T, N, Base>
 	{ using Arg<T, N, Base>::Arg; };
+
+	//Append the parsed value to a vector whenever the flag appears.
+	//allows list of list of values etc.
+	template<class T, int N=1>
+	struct AFlag: public Flag<T, N>
+	{
+		std::vector<decltype(Flag<T, N>::data)> data;
+		//TODO
+	};
 
 }
 #endif //ARGPARSE_ARG_HPP
