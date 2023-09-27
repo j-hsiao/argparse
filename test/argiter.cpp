@@ -6,8 +6,6 @@
 #include <vector>
 #include <cassert>
 
-#include "argstruct.hpp"
-
 
 int main(int argc, char *argv[])
 {

@@ -368,7 +368,7 @@ namespace argparse
 		{}
 	};
 
-	template<class impl>
+	template<class T, class impl>
 	struct Wrapper: public impl
 	{
 		typedef decltype(impl::data) data_type;
@@ -380,55 +380,8 @@ namespace argparse
 
 		data_type* operator->() { return &this->data; }
 		const data_type* operator->() const { return &this->data; }
-	};
 
-	template<class T, int N=1, class Base=ArgCommon, bool multi=(N<0||N>1)>
-	struct Arg: public Wrapper<BasicArg<T, N, Base>>
-	{
-		typedef Wrapper<BasicArg<T, N, Base>> par;
-		using par::par;
-
-		T& operator[](std::size_t idx)
-		{ return this->data[idx]; }
-
-		const T& operator[](std::size_t idx) const
-		{ return this->data[idx]; }
-
-		std::ostream& print_value(std::ostream &o) const
-		{
-			auto start = this->data.begin();
-			auto stop = this->data.end();
-			o << "[";
-			if (start != stop)
-			{
-				check::print(o, *start);
-				++start;
-			}
-			for (; start != stop; ++start)
-			{
-				o << ", ";
-				check::print(o, *start);
-			}
-			o << ']';
-			return o;
-		}
-
-		virtual std::ostream& print_defaults(std::ostream &o) const override
-		{
-			if (this->required || !check::Printable<T>::value) { return o; }
-			o << " Default: ";
-			print_value(o);
-			return o;
-		}
-	};
-
-	template<class T, int N, class Base>
-	struct Arg<T, N, Base, false>: public Wrapper<BasicArg<T, N, Base>>
-	{
-		typedef Wrapper<BasicArg<T, N, Base>> par;
-		using par::par;
-
-		std::ostream& print_value(std::ostream &o) const
+		virtual std::ostream& print_value(std::ostream &o) const
 		{
 			check::print(o, this->data);
 			return o;
@@ -441,6 +394,26 @@ namespace argparse
 			print_value(o);
 			return o;
 		}
+	};
+
+	template<class T, int N=1, class Base=ArgCommon, bool multi=(N<0||N>1)>
+	struct Arg: public Wrapper<T, BasicArg<T, N, Base>>
+	{
+		typedef Wrapper<T, BasicArg<T, N, Base>> par;
+		using par::par;
+
+		T& operator[](std::size_t idx)
+		{ return this->data[idx]; }
+
+		const T& operator[](std::size_t idx) const
+		{ return this->data[idx]; }
+	};
+
+	template<class T, int N, class Base>
+	struct Arg<T, N, Base, false>: public Wrapper<T, BasicArg<T, N, Base>>
+	{
+		typedef Wrapper<T, BasicArg<T, N, Base>> par;
+		using par::par;
 	};
 
 	//remainder args
@@ -471,18 +444,18 @@ namespace argparse
 		operator ArgIter&() { return data; }
 		operator const ArgIter&() const { return data; }
 
-		std::ostream& print_count(std::ostream &o) const
+		std::ostream& print_count(std::ostream &o) const override
 		{
 			o << " ***";
 			return o;
 		}
-		std::ostream& print_defaults(std::ostream &o) { return o; }
+		std::ostream& print_defaults(std::ostream &o) const override { return o; }
 
-		data_type& operator*() { return this->data; }
-		const data_type& operator*() const { return this->data; }
+		ArgIter& operator*() { return this->data; }
+		const ArgIter& operator*() const { return this->data; }
 
-		data_type* operator->() { return &this->data; }
-		const data_type* operator->() const { return &this->data; }
+		ArgIter* operator->() { return &this->data; }
+		const ArgIter* operator->() const { return &this->data; }
 	};
 
 	template<class T, int N, class Base>
@@ -499,10 +472,72 @@ namespace argparse
 	//Append the parsed value to a vector whenever the flag appears.
 	//allows list of list of values etc.
 	template<class T, int N=1>
-	struct AFlag: public Flag<T, N>
+	struct Aflag: public Flag<T, N>
 	{
 		std::vector<decltype(Flag<T, N>::data)> data;
-		//TODO
+		bool clean;
+
+		template<class Parser>
+		Aflag(Parser &p, const char *name, const char *help):
+			Aflag(p, {name}, help)
+		{}
+
+		template<class Parser>
+		Aflag(Parser &p, const char *name, const char *help, decltype(data) defaults):
+			Aflag(p, {name}, help, defaults)
+		{}
+
+		template<class Parser>
+		Aflag(Parser &p, std::initializer_list<const char *> names, const char *help):
+			Flag<T, N>(p, names, help),
+			data{},
+			clean(true)
+		{}
+
+		template<class Parser>
+		Aflag(
+			Parser &p, std::initializer_list<const char *> names, const char *help,
+			decltype(data) defaults
+		):
+			Flag<T, N>(p, names, help, {}),
+			data{defaults},
+			clean(true)
+		{}
+
+		decltype(Flag<T, N>::data)& operator[](std::size_t idx){ return data[idx]; }
+		const decltype(Flag<T, N>::data)& operator[](std::size_t idx) const { return data[idx]; }
+
+		decltype(data)& operator*() { return data; }
+		const decltype(data)& operator*() const { return data; }
+
+		decltype(data)* operator->() { return &data; }
+		const decltype(data)* operator->() const { return &data; }
+
+		bool parse(ArgIter &it) override
+		{
+			if (clean)
+			{
+				data.clear();
+				clean = false;
+			}
+			if (Flag<T, N>::parse(it))
+			{
+				data.push_back(Flag<T, N>::data);
+				return true;
+			}
+			return false;
+		}
+		std::ostream& print_count(std::ostream &o) const
+		{
+			o << " ...";
+			return o;
+		}
+
+		std::ostream& print_value(std::ostream &o) const override
+		{
+			check::print(o, data);
+			return o;
+		}
 	};
 
 }

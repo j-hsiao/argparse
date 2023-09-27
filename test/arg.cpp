@@ -55,6 +55,9 @@ int main(int argc, char *argv[])
 		assert(expect == *mynums);
 		mynums.print_defaults(std::cout);
 		std::cout << std::endl;
+		argparse::Arg<const char*, -2> remainder(dummy, "remainder", "the remaining args");
+		assert(remainder.parse(it));
+		assert(!std::strcmp(remainder->arg, "4"));
 	}
 	it.reset();
 	{
@@ -121,6 +124,63 @@ int main(int argc, char *argv[])
 		assert(*tbool);
 		tbool.print_defaults(std::cout);
 		std::cout << std::endl;
+	}
+
+	{
+		it.reset();
+		argparse::Aflag<int> numadds(dummy, "f", "appended nums");
+		assert(numadds.parse(it));
+		assert(numadds.data.size() == 1);
+		assert(numadds.data[0] == 6);
+		assert(numadds.parse(it));
+		assert(numadds.data.size() == 2);
+		assert(numadds.data[0] == 6);
+		assert(numadds.data[1] == 9);
+		assert(numadds.parse(it));
+		assert(numadds.data.size() == 3);
+		assert(numadds.data[0] == 6);
+		assert(numadds.data[1] == 9);
+		assert(numadds.data[2] == 8);
+		assert(numadds.parse(it));
+		assert(numadds.data.size() == 4);
+		assert(numadds.data[0] == 6);
+		assert(numadds.data[1] == 9);
+		assert(numadds.data[2] == 8);
+		assert(numadds.data[3] == 4);
+		std::cout << numadds << std::endl;
+	}
+
+	{
+		it.reset();
+		argparse::Aflag<int, 2> numadds(dummy, "f", "appended nums");
+		assert(numadds.parse(it));
+		assert(numadds.data.size() == 1);
+		assert(numadds.data[0][0] == 6);
+		assert(numadds.data[0][1] == 9);
+		assert(numadds.parse(it));
+		assert(numadds.data.size() == 2);
+		assert(numadds.data[0][0] == 6);
+		assert(numadds.data[0][1] == 9);
+		assert(numadds.data[1][0] == 8);
+		assert(numadds.data[1][1] == 4);
+		std::cout << numadds << std::endl;
+	}
+
+	{
+		it.reset();
+		argparse::Aflag<int, 2> numadds(dummy, "f", "appended nums", {{1,2}, {3,4}, {5,6}});
+		numadds.print_defaults(std::cout) << std::endl;
+		assert(numadds.parse(it));
+		assert(numadds.data.size() == 1);
+		assert(numadds.data[0][0] == 6);
+		assert(numadds[0][1] == 9);
+		assert(numadds.parse(it));
+		assert(numadds->size() == 2);
+		assert(numadds[0][0] == 6);
+		assert(numadds[0][1] == 9);
+		assert(numadds[1][0] == 8);
+		assert(numadds[1][1] == 4);
+		std::cout << numadds << std::endl;
 	}
 	return 0;
 }

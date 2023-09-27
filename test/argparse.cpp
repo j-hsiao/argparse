@@ -2,7 +2,6 @@
 
 #include "argparse/argparse.hpp"
 #include "argparse/argiter.hpp"
-#include "argstruct.hpp"
 #include <cassert>
 #include <cstring>
 #include <iostream>

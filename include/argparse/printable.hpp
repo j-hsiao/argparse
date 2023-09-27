@@ -31,6 +31,27 @@ namespace argparse { namespace check
 	template<class T>
 	T& lval();
 
+	//print for iterable, generally std::vector/std::array
+	template<class T, decltype(lval<T>().begin())*V=nullptr>
+	std::ostream& print(std::ostream &o, const T &item)
+	{
+		auto start = item.begin();
+		auto stop = item.end();
+		o << "[";
+		if (start != stop)
+		{
+			print(o, *start);
+			++start;
+		}
+		for (; start != stop; ++start)
+		{
+			o << ", ";
+			print(o, *start);
+		}
+		o << ']';
+		return o;
+	}
+
 	template<class T>
 	struct Printable
 	{
