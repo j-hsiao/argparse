@@ -210,6 +210,7 @@ namespace argparse
 					header = false;
 				}
 				flaghelp(pair.second, "  ");
+				handled.insert(pair.second);
 			}
 		}
 		header = true;
@@ -223,6 +224,7 @@ namespace argparse
 					header = false;
 				}
 				arghelp(argpt, "  ", namecount);
+				handled.insert(argpt);
 			}
 		}
 	}

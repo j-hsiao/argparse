@@ -20,7 +20,7 @@
 
 #include "argparse/argiter.hpp"
 #include "argparse/parse.hpp"
-#include "argparse/printable.hpp"
+#include "argparse/print.hpp"
 
 #include <array>
 #include <ostream>
@@ -370,13 +370,13 @@ namespace argparse
 
 		virtual std::ostream& print_value(std::ostream &o) const
 		{
-			check::print(o, this->data);
+			print::print(o, this->data);
 			return o;
 		}
 
 		virtual std::ostream& print_defaults(std::ostream &o) const override
 		{
-			if (this->required || !check::Printable<T>::value) { return o; }
+			if (this->required || !print::Printable<T>::value) { return o; }
 			o << " Default: ";
 			print_value(o);
 			return o;
@@ -522,7 +522,7 @@ namespace argparse
 
 		std::ostream& print_value(std::ostream &o) const override
 		{
-			check::print(o, data);
+			print::print(o, data);
 			return o;
 		}
 	};

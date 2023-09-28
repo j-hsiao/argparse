@@ -43,8 +43,12 @@ namespace argparse
 				it.stepbreak();
 				return 1;
 			}
-			else if (parse(tmp, it) == 1)
-			{ v.push_back(std::move(tmp)); }
+			else if (int code = parse(tmp, it))
+			{
+				v.push_back(std::move(tmp));
+				if (code == 2)
+				{ return 2; }
+			}
 			else
 			{ return 2; }
 		}

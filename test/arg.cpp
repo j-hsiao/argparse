@@ -221,11 +221,30 @@ int main(int argc, char *argv[])
 		assert(vv[1][1] == 6);
 		assert(vv[1][2] == 7);
 		assert(vv[1][3] == 8);
-
 		assert(it);
 		assert(!std::strcmp(it.arg, "asdf"));
 
 		std::cout << vv << std::endl;
+
+		args[9] = "--asdf";
+		it.reset();
+
+		assert(it);
+		assert(vv.parse(it));
+		assert(vv->size() == 2);
+		assert(vv[0].size() == 3);
+		assert(vv[1].size() == 4);
+		assert(vv[0][0] == 1);
+		assert(vv[0][1] == 2);
+		assert(vv[0][2] == 3);
+		assert(vv[1][0] == 5);
+		assert(vv[1][1] == 6);
+		assert(vv[1][2] == 7);
+		assert(vv[1][3] == 8);
+		assert(it);
+		assert(it.isflag == 2);
+		assert(!std::strcmp(it.arg, "asdf"));
+
 	}
 	return 0;
 }

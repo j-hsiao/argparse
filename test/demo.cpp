@@ -60,6 +60,8 @@ int main(int argc, char *argv[])
 		Flag<bool> count(p, {"c", "count"}, "count flag instances");
 		Flag<bool> verbose(p, {"v", "verbose"}, "verbosity level", -1);
 
+		Flag<std::vector<const char*>, -1> sentences(p, {"s", "sentences"}, "variable number of sentences.", {{"default", "sentence."}});
+
 		//Flag<bool> hx(p, "h", "h flag so -h should not trigger help");
 
 		Arg<mynamespace::Point> rspoint(
@@ -106,6 +108,18 @@ int main(int argc, char *argv[])
 		std::cout << "verbose: " << verbose << std::endl;
 
 		std::cout << "point: " << rspoint << std::endl;
+
+		std::cout << "number of sentences: " << sentences->size() << std::endl;
+		if (sentences->size())
+		{
+			std::cout << "sentences:" << std::endl;
+			for (auto &sentence : *sentences)
+			{
+				std::cout << "  ";
+				argparse::print::print(std::cout, sentence) << std::endl;
+			}
+		}
+
 	}
 	catch (std::exception &e)
 	{
