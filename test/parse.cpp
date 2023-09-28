@@ -25,19 +25,19 @@ int main(int argc, char *argv[])
 	};
 	argparse::ArgIter p(11, args, "-");
 	assert(p.isflag == 1);
-	assert(p.flag()[0] == 'f');
+	assert(p.arg[0] == 'f');
 	p.stepflag();
 	bool result = argparse::parse(f, p);
 	assert(result);
 	assert(f == 3.14f);
 	assert(p.isflag == 1);
-	assert(p.flag()[0] == 'd');
+	assert(p.arg[0] == 'd');
 	p.stepflag();
 	result = argparse::parse(d, p);
 	assert(result);
 	assert(d == 1.23);
 	assert(p.isflag == 1);
-	assert(p.flag()[0] == 'i');
+	assert(p.arg[0] == 'i');
 	p.stepflag();
 	result = argparse::parse(i, p);
 	assert(result);
@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 
 	assert(p.isflag == 1);
 	assert(!p.isarg());
-	assert(p.flag()[0] == 'o');
+	assert(p.arg[0] == 'o');
 	p.stepflag();
 	assert(p.isarg());
 	result = argparse::parse(c, p);

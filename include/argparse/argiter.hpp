@@ -1,8 +1,6 @@
 #ifndef ARGPARSE_ARGITER_HPP
 #define ARGPARSE_ARGITER_HPP
 #include <cstddef>
-#include <cstring>
-#include <cstdlib>
 
 namespace argparse
 {
@@ -31,9 +29,10 @@ namespace argparse
 		bool isarg() const;
 		bool breakpoint() const;
 		//name of flag without prefix chars
-		const char* flag() const;
 
-		//Assume the current arg is a short flag.
+		void stepbreak();
+
+		//Assume the current arg is a short flag (isflag == 1).
 		//Step through the current short-flag position
 		//If the current arg is exhausted, then step
 		//to the next arg.

@@ -87,7 +87,6 @@ namespace argparse
 		{ if (p) { p->add(*this); } }
 	};
 
-	struct Dummy {};
 	//Fixed num of multiple arguments
 	template<class T, int N, class Base>
 	struct FixedArgs: public Base
@@ -122,18 +121,14 @@ namespace argparse
 		template<class Parser>
 		FixedArgs(
 			Parser &p, std::initializer_list<const char*> names,
-			const char *help, Dummy d
+			const char *help, int dummy
 		):
 			Base(&p, names, help, false),
 			data{}
 		{}
 
 		virtual bool parse(ArgIter &it) override
-		{
-			for (int i = 0; i < N; ++i)
-			{ if (!argparse::adl_parse(data[i], it)) { return false; } }
-			return true;
-		}
+		{ return argparse::adl_parse(data, it); }
 
 		virtual std::ostream& print_count(std::ostream &o) const override
 		{
@@ -168,15 +163,7 @@ namespace argparse
 		{}
 
 		virtual bool parse(ArgIter &it) override
-		{
-			data.clear();
-			T tmp;
-			while (argparse::adl_parse(tmp, it))
-			{ data.push_back(tmp); }
-			if (it && it.breakpoint())
-			{ it.step(); }
-			return true;
-		}
+		{ return argparse::adl_parse(data, it); }
 
 		virtual std::ostream& print_count(std::ostream &o) const override
 		{
@@ -362,9 +349,9 @@ namespace argparse
 		template<class Parser>
 		BasicArg(
 			Parser &p, const char *name,
-			const char *help, Dummy d
+			const char *help, int dummy
 		):
-			FixedArgs<T, N, Base>(p, {name}, help, d)
+			FixedArgs<T, N, Base>(p, {name}, help, dummy)
 		{}
 	};
 

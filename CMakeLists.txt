@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.0)
 project(argparse VERSION 0.4 LANGUAGES CXX)
-add_library(${PROJECT_NAME} src/argparse.cpp)
+add_library(
+	${PROJECT_NAME}
+	src/argparse.cpp
+	src/parse.cpp
+	src/argiter.cpp
+	src/nums.cpp
+)
 target_include_directories(
 	${PROJECT_NAME} PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>

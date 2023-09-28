@@ -182,5 +182,50 @@ int main(int argc, char *argv[])
 		assert(numadds[1][1] == 4);
 		std::cout << numadds << std::endl;
 	}
+
+	{
+		it.reset();
+		argparse::Arg<std::array<int, 2>, -1> numadds(dummy, "f", "appended pairs");
+		assert(numadds.parse(it));
+		assert(numadds.data.size() == 2);
+		assert(numadds.data[0][0] == 6);
+		assert(numadds.data[0][1] == 9);
+		assert(numadds.data[1][0] == 8);
+		assert(numadds.data[1][1] == 4);
+		std::cout << numadds << std::endl;
+	}
+
+	{
+		const char *args[] = {
+			"1", "2", "3", "--0", "5", "6", "7", "8", "---0", "asdf"
+		};
+		argparse::ArgIter it(args, "-");
+		argparse::Arg<std::vector<int>,-1> vv(dummy, "f", "list of lists of ints", {{3,2}, {1}});
+
+		assert(vv[0].size() == 2);
+		assert(vv[1].size() == 1);
+		assert(vv[0][0] == 3);
+		assert(vv[0][1] == 2);
+		assert(vv[1][0] == 1);
+		std::cout << vv << std::endl;
+
+		assert(it);
+		assert(vv.parse(it));
+		assert(vv->size() == 2);
+		assert(vv[0].size() == 3);
+		assert(vv[1].size() == 4);
+		assert(vv[0][0] == 1);
+		assert(vv[0][1] == 2);
+		assert(vv[0][2] == 3);
+		assert(vv[1][0] == 5);
+		assert(vv[1][1] == 6);
+		assert(vv[1][2] == 7);
+		assert(vv[1][3] == 8);
+
+		assert(it);
+		assert(!std::strcmp(it.arg, "asdf"));
+
+		std::cout << vv << std::endl;
+	}
 	return 0;
 }
