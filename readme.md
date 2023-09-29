@@ -1,4 +1,5 @@
-# Overview
+# Argparse
+## Overview
 C++ commandline argument parsing.
 
 In general, there are 2 types of arguments.  Positional arguments are
@@ -12,28 +13,40 @@ Long flags must be followed by a space.  A space before the first
 argument to short flags is optional.  Short boolean flags can be
 combined as a single argument.
 
-example:
-`-v|--verbose`: bool
-`-d|--debug`: bool
-`-c|--count`: int
+All flag names must be unique.  Positional arguments can have the same
+name, but this is discouraged because it can be confusing.  If there
+are multiple positional arguments with the same name, then the full help
+message will indicate the positional index of the argument.
 
-`-vd` = `-v -d` = `--verbose --debug`
-`-vc5` = `-vc 5` = `-v -c 5` = `-v --count 5`
+Arguments can be multi-valued in which case the corresponding values
+should be consecutive.  They will be interrupted by flags or the
+`--0` special flag.  The `--` or `--N` special flags will not interrupt
+multi-valued sequences.
+
+## short flag examples:
+`-v|--verbose`: bool, `-d|--debug`: bool, `-c|--count`: int
+
+`-vd` = `-v -d` = `--verbose -d` = `--verbose --debug` ...
+
+`-vc5` = `-vc 5` = `-v -c 5` = `-v --count 5` ...
+
 bad: `-vc5d`
 
 c takes an argument and there are trailing characters for c.  This means
 that `5d` is the argument which is not a valid int (base 10).
 
-There are special flags.
-
+## Special flags
+### `--`
 `--` means to treat all remaining arguments as
 positional arguments regardless of whether or not they begin with a prefix
 character.
 
+### `--N`
 `--N` where N is an integer has a similar meaning to `--` except it only
-treats th enext N arguments as positional arguments regardless of prefix
+treats the next N arguments as positional arguments regardless of prefix
 characters.
 
+### `--0`
 `--0` stops variable-length parsing.  There must be at least 2 prefix
 characters followed by a 0.  The number of dashes indicates the level
 at which it should stop.  For example, a variable-length argument
@@ -52,12 +65,13 @@ immediately, resulting in an empty list.  The next list is then `4`,
 `5`, `6`.  The `---0` interrupts both the current list and the list
 of lists.  As a result, the `7` would be left for the next argument.
 
+### `-h|--help`
 `-h` and `--help` trigger a help message.  `-h` prints a short version
 of the help messages that just show the arguments and their counts.
 `--help` will trigger the full help message complete with defaults,
 descriptions, etc.  Arguments named `h` or `help` will take precedence
 over the default `-h` and `--help` flags.
-The counts are:
+The count descriptions are:
 * `xN`: exactly N values.
 * `...`: variable number of values.
 * `++`: bool flag.  Increments a value for every occurrence.
@@ -65,26 +79,16 @@ The counts are:
 Required arguments will be surrounded in `<>` and optional arguments
 will be surrounded in `[]`.
 
-Arguments can be multi-valued in which case the corresponding values
-should be consecutive.  They will be interrupted by flags or the
-`--0` special flag.  The `--` or `--N` special flags will not interrupt
-multi-valued sequences.
-
-All flag names must be unique.  Positional arguments can have the same
-name, but this is discouraged because it can be confusing.  If there
-are multiple positional arguments with the same name, then the full help
-message will indicate the positional index of the argument.
-
-# Usage
+## Usage
 See `test/demo.cpp` for example usage.
 
 All classes and functions are in the `argparse::` namespace.
 
-## Constructing the parser
+### Constructing the parser
 ```
 Parser(
   const char *description=nullptr,
-  const char *prefix="-",
+  char prefix='-',
   std::ostream& out=std::cerr)
 ```
 
@@ -94,14 +98,19 @@ Parser(
 
 `out` is the output stream to print any help or error messages to.
 
-## Arguments.
+### Arguments.
 Positional arguments use the `Arg` type.  Flags use the `Flag` type.
 Both flags and positional arguments have the same general interface.
 Arguments wrap a value which is modified directly during parsing.
 A type and a count determine the type that is wrapped and are given as
 template paramters.  The count defaults to `1`.
 
-type examples:
+Multivalue arguments (count > 1 or count < 0) have operator[] defined
+allowing indexing on the underlying `std::vector` or `std::array`.
+All args have `*` and `->` operators defined to access the underlying
+value.  Alternatively, the value can be accessed as the `.data` member.
+
+#### type examples:
 * `Arg<int, 1>`: `int`
 * `Arg<int, N>`: `std::array<int, N>`, where `N > 1`
 * `Arg<int, -1>`: `std::vector<int>`
@@ -114,11 +123,11 @@ type examples:
 positional arguments.  The other `<type, count>` are applicable to both
 flags and positionals.
 
-Multivalue arguments (count > 1 or count < 0) have operator[] defined
-allowing indexing on the underlying `std::vector` or `std::array`.
-All args have `*` and `->` operators defined to access the underlying
-value.  Alternatively, the value can be accessed as the `.data` member.
+The `Base<type, base>` type has conversion operators to the underlying
+`type` as well as `*` operator for explicit access.  Alternatively the
+value can be accessed by the `.data` member.
 
+#### Argument Constructors
 Argument constructors take a few arguments.
 
 `Arg(parser, name, help, defaults)`
@@ -126,7 +135,9 @@ Argument constructors take a few arguments.
 `parser` is the `Parser` instance to add the argument to.
 
 `name` is the name (`const char*`) or names (`std::initializer_list<const char*>`)
-for the argument.
+for the argument.  Note that even if it is a `Flag` argument, the names
+should not begin with a prefix char.  This allows easy changing of the
+prefix char via the `Parser` argument if needed.
 
 `help` is the help message for the argument (`const char*`).  nullptr is
 acceptable to indicate no help message.  The help message is used in the
@@ -143,11 +154,7 @@ be used as the type instead.  `Flag<Base<int, 8>, 1>` will result
 in a flag argument that expects a single octal int.  The wrapped type
 will be `Base<int, 8>`.
 
-The `Base<type, base>` type has conversion operators to the underlying
-`type` as well as `*` operator for explicit access.  Alternatively the
-value can be accessed by the `.data` member.
-
-## Parsing Arguments.
+### Parsing Arguments.
 Use `Parser::parse(...)` to parse arguments.  There are several
 overloads of the `parse` method for convenience.
 
@@ -176,7 +183,7 @@ code is not `success`.  It also has a `bool parsed(arg)` method
 to check if a value was actually parsed or not.  This can be useful
 for optional arguments if it matters whether it was parsed or not.
 
-## Argument groups
+### Argument groups
 Groups can be instantiated with the Group type `Group(parser, name)`.
 The group can be used in place of the parser when instantiating
 arguments.  In regards to parsing, the effect is the same as just
@@ -184,7 +191,7 @@ instantiating it with the parser, but when generating a full help,
 arguments in the same group will be grouped together.  This can make
 reading the help message a little easier.
 
-# Custom types
+### Custom types
 Custom types can be used with argparse by defining a
 `int parse(Type &, ArgIter &it)` method.  This method could be an
 overload in the `argparse::` namespace, but the most appropriate would
