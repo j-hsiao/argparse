@@ -48,11 +48,11 @@ namespace argparse
 		std::vector<Group*> groups;
 		std::map<const char*, FlagCommon*, Cmp> flags;
 		const char *description;
-		const char *prefix;
+		const char prefix[2];
 		std::ostream &out;
 
 		Parser(
-			const char *description, const char *prefix="-",
+			const char *description=nullptr, char prefix='-',
 			std::ostream &out=std::cerr);
 
 		void add(ArgCommon &arg);

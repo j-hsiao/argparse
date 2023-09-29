@@ -72,11 +72,11 @@ namespace argparse
 	}
 
 	Parser::Parser(
-		const char *description, const char *prefix,
+		const char *description, char prefix,
 		std::ostream &out
 	):
 		description(description),
-		prefix(prefix),
+		prefix{prefix, '\0'},
 		out(out)
 	{}
 

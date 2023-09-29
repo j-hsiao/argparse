@@ -12,7 +12,7 @@ int basics(const char *prog)
 {
 	std::stringstream ss;
 	using namespace argparse;
-	Parser p("Test program", "-", ss);
+	Parser p("Test program", '-', ss);
 	Arg<int> num(p, "num", "A number, required");
 	assert(num.required);
 

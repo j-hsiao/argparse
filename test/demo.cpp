@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
 
 		Flag<std::vector<const char*>, -1> sentences(p, {"s", "sentences"}, "variable number of sentences.", {{"default", "sentence."}});
 
-		//Flag<bool> hx(p, "h", "h flag so -h should not trigger help");
+		Flag<Base<int, 16>, 1> hex(p, "hex", "A hex number.", {});
 
 		Arg<mynamespace::Point> rspoint(
 			p, "required num",
@@ -119,6 +119,12 @@ int main(int argc, char *argv[])
 				argparse::print::print(std::cout, sentence) << std::endl;
 			}
 		}
+
+		//hex is Flag<Base<int, 16>, 1>
+		//The first * accesses the Base<int,16> inside hex
+		//The second * accesses the int inside hex.data
+		if (result.parsed(hex))
+		{ std::cerr << "hex was parsed to " << **hex << std::endl; }
 
 	}
 	catch (std::exception &e)

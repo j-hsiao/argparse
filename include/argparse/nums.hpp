@@ -68,6 +68,10 @@ namespace argparse
 		T data;
 		operator T&() { return data; }
 		operator const T&() const { return data; }
+
+		T& operator*() { return data; }
+		const T& operator*() const { return data; }
+
 		Base& operator=(const T &v) { data = v; return *this; }
 	};
 
